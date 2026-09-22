@@ -5,61 +5,95 @@
  * 作用：让不擅长开发的同事用结构化表单把需求描述清楚，便于他人认领
  */
 import { api } from '@/lib/api';
-import { TASK_AVATARS, pickTaskAvatar } from '@/lib/avatars';
-import type { Project } from '@/lib/types';
+import type { Attachment, Paginated, Project } from '@/lib/types';
 import AttachmentUploader, { type AttachmentValue } from '@/components/AttachmentUploader';
-import AvatarPicker from '@/components/AvatarPicker';
+import ProjectDescriptionEditor from '@/components/ProjectDescriptionEditor';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, DatePicker, Form, Input, Select, Space, Typography, message } from 'antd';
-import dayjs from 'dayjs';
+import { Button, Card, Col, Form, Input, Modal, Row, Space, Typography, message } from 'antd';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-/** 常用需求标签候选 */
-const TAG_OPTIONS = [
-  '报表',
-  '自动化',
-  '数据处理',
-  '前端页面',
-  '内部工具',
-  '接口对接',
-  '流程审批',
-  '数据看板',
-  '文件处理',
-  '消息通知',
-  '移动端',
-  '性能优化',
-];
+/** 新需求向导草稿键 */
+const DRAFT_KEY = 'aimanager_new_project_draft';
 
 export default function NewProjectPage() {
   const router = useRouter();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+  const [inlineImages, setInlineImages] = useState<Attachment[]>([]);
+
+  /** 恢复未发布的草稿，避免误关页面后重新填写 */
+  useEffect(() => {
+    const draft = window.localStorage.getItem(DRAFT_KEY);
+    if (!draft) {
+      return;
+    }
+    try {
+      form.setFieldsValue(JSON.parse(draft));
+    } catch {
+      window.localStorage.removeItem(DRAFT_KEY);
+    }
+  }, [form]);
 
   /** 提交需求 */
   const onFinish = async (values: {
     title: string;
     description: string;
-    acceptanceCriteria?: string;
-    tags?: string[];
-    avatar?: string;
-    expectedAt?: dayjs.Dayjs;
     attachments?: AttachmentValue;
   }) => {
     setSubmitting(true);
     try {
+      const similar = await api.get<Paginated<Project>>('/projects', {
+        keyword: values.title,
+        pageSize: 3,
+      });
+      if (similar.items.length > 0) {
+        const continuePublish = await new Promise<boolean>((resolve) => {
+          Modal.confirm({
+            title: '发现了可能相似的需求',
+            content: (
+              <Space direction="vertical">
+                <Typography.Text>先看看下面这些需求，可能不需要重复提报：</Typography.Text>
+                {similar.items.map((item) => (
+                  <Space key={item.id} style={{ width: '100%', justifyContent: 'space-between' }}>
+                    <Typography.Text>{item.title}</Typography.Text>
+                    <Button
+                      type="link"
+                      onClick={async () => {
+                        await api.post(`/projects/${item.id}/requesters`, {});
+                        message.success('已加入共同需求人');
+                        resolve(false);
+                        router.push(`/projects/${item.id}`);
+                      }}
+                    >
+                      这就是我要的，我也想用
+                    </Button>
+                  </Space>
+                ))}
+              </Space>
+            ),
+            okText: '仍发布新需求',
+            cancelText: '先去看看',
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+        if (!continuePublish) {
+          return;
+        }
+      }
       const project = await api.post<Project>('/projects', {
         title: values.title,
         description: values.description,
-        acceptanceCriteria: values.acceptanceCriteria,
-        tags: values.tags ?? [],
-        avatar: values.avatar,
-        expectedAt: values.expectedAt ? values.expectedAt.toISOString() : undefined,
         // 附件已在表单里逐个上传完成，这里只提交主键，由后端挂到需求上
-        imageIds: values.attachments?.images.map((item) => item.id) ?? [],
+        imageIds: [
+          ...inlineImages.map((item) => item.id),
+          ...(values.attachments?.images.map((item) => item.id) ?? []),
+        ],
         attachmentIds: values.attachments?.files.map((item) => item.id) ?? [],
       });
       message.success('需求已发布，等待同事认领');
+      window.localStorage.removeItem(DRAFT_KEY);
       router.push(`/projects/${project.id}`);
     } catch (error) {
       message.error(error instanceof Error ? error.message : '发布失败');
@@ -79,82 +113,61 @@ export default function NewProjectPage() {
       <Card>
         <Typography.Title level={4}>发布需求</Typography.Title>
         <Typography.Paragraph type="secondary">
-          需求描述越具体，越容易被有能力的同事认领。建议写清「现状、痛点、期望效果、验收标准」。
+          只需要写清楚标题和需求详情，其他信息可以在沟通过程中再补充。
         </Typography.Paragraph>
-
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 20 }}
-          message="写需求的小技巧"
-          description="补充当前是怎么做的、涉及哪些人、期望什么时候能用上，以及怎么算做完（验收标准）。"
-        />
 
         <Form
           form={form}
           layout="vertical"
           onFinish={onFinish}
+          onValuesChange={(_, values) => window.localStorage.setItem(DRAFT_KEY, JSON.stringify(values))}
           requiredMark
-          initialValues={{ avatar: pickTaskAvatar(Date.now()) }}
+          initialValues={{ attachments: { images: [], files: [] } }}
         >
-          <Form.Item name="avatar" label="任务头像" extra="选一个头像，方便在需求池里一眼认出这个需求">
-            <AvatarPicker presets={TASK_AVATARS} />
-          </Form.Item>
-
-          <Form.Item
-            name="title"
-            label="需求标题"
-            rules={[{ required: true, min: 4, max: 120, message: '请输入 4-120 个字符的标题' }]}
-          >
-            <Input size="large" placeholder="例如：生产日报自动生成并推送" maxLength={120} showCount />
-          </Form.Item>
-
-          <Form.Item
-            name="description"
-            label="需求详细描述"
-            rules={[{ required: true, min: 10, max: 5000, message: '请填写至少 10 个字符的描述' }]}
-            extra="建议包含：需求背景、目前的做法与痛点、期望的最终效果、涉及的使用人群"
-          >
-            <Input.TextArea rows={10} maxLength={5000} showCount placeholder="请尽量详细地描述你的需求" />
-          </Form.Item>
-
-          <Form.Item
-            name="acceptanceCriteria"
-            label="验收标准"
-            extra="满足哪些条件就认为这个需求完成了，例如「能导出最近 30 天的数据且金额与系统一致」"
-          >
-            <Input.TextArea rows={4} maxLength={2000} showCount placeholder="逐条列出可验证的验收条件" />
-          </Form.Item>
-
-          <Form.Item name="tags" label="需求标签" extra="标签会用于给方向匹配的同事推送提醒">
-            <Select
-              mode="tags"
-              size="large"
-              placeholder="选择或输入标签"
-              options={TAG_OPTIONS.map((item) => ({ label: item, value: item }))}
-            />
-          </Form.Item>
-
-          <Form.Item name="expectedAt" label="期望交付时间">
-            <DatePicker size="large" style={{ width: '100%' }} placeholder="选择期望完成日期（选填）" />
-          </Form.Item>
-
-          <Form.Item
-            name="attachments"
-            label="需求图片与附件"
-            extra="图片会展示在需求详情页的图廊中，附件供参与开发的同事下载查看"
-            initialValue={{ images: [], files: [] }}
-          >
-            <AttachmentUploader />
-          </Form.Item>
-
-          <Form.Item style={{ marginBottom: 0 }}>
+          <Row gutter={[24, 16]}>
+            <Col xs={24} lg={16}>
+              <Form.Item
+                name="title"
+                label="需求标题"
+                rules={[{ required: true, min: 4, max: 120, message: '请输入 4-120 个字符的标题' }]}
+              >
+                <Input size="large" placeholder="例如：内部需求协作平台" maxLength={120} showCount />
+              </Form.Item>
+              <Form.Item
+                name="description"
+                label="需求详情"
+                rules={[{ required: true, min: 10, max: 5000, message: '请至少写 10 个字，描述你希望解决的问题' }]}
+                extra="可以写背景、遇到的问题和期望结果，不需要先写技术方案。"
+              >
+                <ProjectDescriptionEditor onAttachment={(attachment) => setInlineImages((current) => [...current, attachment])} />
+              </Form.Item>
+              <Form.Item name="attachments" label="附件（可选）">
+                <AttachmentUploader />
+              </Form.Item>
+            </Col>
+            <Col xs={24} lg={8}>
+              <Card size="small" title="你写完后，同事会看到" className="wizard-preview">
+                <Typography.Text strong>{Form.useWatch('title', form) || '你的需求标题'}</Typography.Text>
+                <Typography.Paragraph type="secondary" className="pre-wrap" style={{ marginTop: 8 }}>
+                  {Form.useWatch('description', form) || '这里会显示你的需求详情'}
+                </Typography.Paragraph>
+              </Card>
+            </Col>
+          </Row>
+          <Form.Item style={{ marginBottom: 0, marginTop: 16 }}>
             <Space>
               <Button type="primary" htmlType="submit" size="large" loading={submitting}>
                 发布需求
               </Button>
-              <Button size="large" onClick={() => form.resetFields()}>
-                重置
+              <Button
+                size="large"
+                onClick={() => {
+                  form.resetFields();
+                  setInlineImages([]);
+                  window.localStorage.removeItem(DRAFT_KEY);
+                }}
+              >
+                重新开始
               </Button>
             </Space>
           </Form.Item>

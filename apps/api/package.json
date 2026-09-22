@@ -8,11 +8,13 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
+    "test": "jest --runInBand",
     "lint": "tsc --noEmit -p tsconfig.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
-    "seed:demo": "node prisma/seed-demo.js"
+    "seed:demo": "node prisma/seed-demo.js",
+    "seed:real-case": "node prisma/seed-real-case.js"
   },
   "dependencies": {
     "@nestjs/bullmq": "^10.2.1",
@@ -43,9 +45,12 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",
+    "@types/multer": "^2.2.0",
     "@types/node": "^20.17.10",
     "@types/nodemailer": "^6.4.17",
     "@types/passport-jwt": "^4.0.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.2"

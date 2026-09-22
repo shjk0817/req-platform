@@ -21,6 +21,8 @@ export interface CreateNotificationInput {
   link?: string;
   /** 是否同时发送邮件（默认 true） */
   sendMail?: boolean;
+  /** 相同类型与链接的去重窗口（天） */
+  dedupeWindowDays?: number;
 }
 
 @Injectable()
@@ -38,6 +40,20 @@ export class NotificationsService {
    * @param input 通知内容
    */
   async create(input: CreateNotificationInput) {
+    if (input.dedupeWindowDays && input.link) {
+      const recent = await this.prisma.notification.findFirst({
+        where: {
+          userId: input.userId,
+          type: input.type,
+          link: input.link,
+          createdAt: { gte: new Date(Date.now() - input.dedupeWindowDays * 24 * 60 * 60 * 1000) },
+        },
+        select: { id: true },
+      });
+      if (recent) {
+        return recent;
+      }
+    }
     const notification = await this.prisma.notification.create({
       data: {
         userId: input.userId,
@@ -48,7 +64,8 @@ export class NotificationsService {
       },
     });
 
-    if (input.sendMail !== false) {
+    // 邮件只由明确标记的关键事件发送，普通站内通知不打扰用户邮箱。
+    if (input.sendMail === true) {
       try {
         const user = await this.prisma.user.findUnique({
           where: { id: input.userId },

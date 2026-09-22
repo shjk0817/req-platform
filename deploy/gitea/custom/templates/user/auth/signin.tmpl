@@ -9,16 +9,17 @@
 	{{template "user/auth/signin_navbar" .}}
 	<div class="ui middle very relaxed page grid">
 		<div class="ui container column fluid">
-			<div class="ui segment" style="border-left:4px solid #1677ff;background:#f6faff;">
-				<h3 style="margin:0 0 8px;">内部需求协作平台 · Git 服务</h3>
-				<p style="margin:0 0 6px;color:#555;">
+			<div class="ui segment aimanager-signin-intro">
+				<div class="aimanager-eyebrow">WORKFLOW ATELIER / GIT SERVICE</div>
+				<h3>内部需求协作平台 · Git 服务</h3>
+				<p>
 					员工账号由平台统一开通，无需在此注册。推荐从需求协作平台点击「代码仓库」进入，
 					平台会自动完成登录，不需要再输入一套 Git 密码。
 				</p>
-				<p style="margin:0 0 10px;color:#555;">
-					仓库统一放在 <code>projects</code> 组织下，命名规则为 <code>req-&lt;需求编号&gt;-&lt;标题&gt;</code>。
+				<p>
+					仓库统一放在 <code>projects</code> 组织下，仓库名可在认领时填写，中文别名会显示在平台成果页。
 				</p>
-				<a class="ui primary button" id="back-to-platform" href="/">返回需求协作平台</a>
+				<a class="ui primary button aimanager-back-button" id="back-to-platform" href="/">返回需求协作平台</a>
 			</div>
 			{{template "user/auth/signin_inner" .}}
 		</div>

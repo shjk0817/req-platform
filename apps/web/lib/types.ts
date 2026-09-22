@@ -13,6 +13,8 @@ export type ProjectStatus = 'OPEN' | 'CLAIMED' | 'DEVELOPING' | 'RELEASED' | 'CL
 export type FeedbackType = 'BUG' | 'IMPROVEMENT' | 'QUESTION';
 /** 反馈状态 */
 export type FeedbackStatus = 'OPEN' | 'PROCESSING' | 'RESOLVED' | 'CLOSED';
+/** 试用验收结果 */
+export type AcceptanceItemResult = 'PENDING' | 'PASSED' | 'FAILED';
 
 /** 当前登录用户 */
 export interface User {
@@ -39,11 +41,33 @@ export interface UserBrief {
   giteaUsername?: string | null;
 }
 
+/** CLI / MCP 个人访问令牌摘要 */
+export interface IntegrationTokenSummary {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  scopes: string[];
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
 /** 共同需求人 */
 export interface ProjectRequester {
   id: string;
   createdAt: string;
   user: UserBrief;
+}
+
+/** 项目沟通与追加需求记录 */
+export interface ProjectUpdate {
+  id: string;
+  projectId: string;
+  kind: 'COMMUNICATION' | 'ADDITIONAL_REQUIREMENT';
+  content: string;
+  createdAt: string;
+  author: UserBrief;
 }
 
 /** 分页返回结构 */
@@ -62,6 +86,7 @@ export interface Project {
   description: string;
   acceptanceCriteria?: string | null;
   tags: string[];
+  requiredSkills: string[];
   /** 任务头像标识（如 task-01） */
   avatar?: string | null;
   status: ProjectStatus;
@@ -72,9 +97,14 @@ export interface Project {
   ownerId?: string | null;
   repoOwner?: string | null;
   repoName?: string | null;
+  repoDisplayName?: string | null;
   repoUrl?: string | null;
+  demoUrl?: string | null;
   claimedAt?: string | null;
   releasedAt?: string | null;
+  acceptedAt?: string | null;
+  overdue?: boolean;
+  overdueDays?: number;
   createdAt: string;
   updatedAt: string;
   creator?: UserBrief;
@@ -85,12 +115,26 @@ export interface Project {
   images?: Attachment[];
   /** 需求附件（可下载） */
   files?: Attachment[];
+  /** 逐条试用验收清单 */
+  acceptanceItems?: AcceptanceItem[];
   /** 附件总数（列表页用于提示） */
   attachmentCount?: number;
   members?: Array<{ id: string; role: 'OWNER' | 'COLLABORATOR'; user: UserBrief }>;
   claims?: Array<{ id: string; remark?: string | null; createdAt: string; user: UserBrief }>;
+  updates?: ProjectUpdate[];
   pullRequests?: PullRequest[];
+  pullRequestPage?: { page: number; pageSize: number; total: number; totalPages: number };
+  timeline?: Array<{ at: string; type: string; text: string; detail?: string | null }>;
   _count?: { feedbacks: number; pullReqs: number; members?: number; attachments?: number };
+}
+
+/** 逐条验收条目 */
+export interface AcceptanceItem {
+  id: string;
+  content: string;
+  sort: number;
+  result: AcceptanceItemResult;
+  note?: string | null;
 }
 
 /** 需求图片 / 附件 */
@@ -108,6 +152,40 @@ export interface Attachment {
   /** 下载地址 */
   downloadUrl: string;
   createdAt: string;
+}
+
+/** Gitea 仓库中的 README 或使用教程 */
+export interface DeliverableDocument {
+  path: string;
+  content: string;
+  htmlUrl?: string;
+}
+
+/** Release 中可直接下载的文件 */
+export interface DeliverableDownloadAsset {
+  id: number;
+  name: string;
+  size: number;
+  downloadUrl: string;
+}
+
+/** 项目成果中心接口返回 */
+export interface ProjectDeliverables {
+  project: Pick<Project, 'id' | 'title' | 'repoDisplayName' | 'repoOwner' | 'repoName' | 'repoUrl' | 'demoUrl'>;
+  showcase: {
+    demoUrl?: string | null;
+    images: Attachment[];
+  };
+  readme: DeliverableDocument | null;
+  tutorial: DeliverableDocument | null;
+  downloads: Array<{
+    id: number;
+    tag: string;
+    name: string;
+    htmlUrl: string;
+    publishedAt?: string | null;
+    assets: DeliverableDownloadAsset[];
+  }>;
 }
 
 /** Pull Request 快照 */
@@ -183,6 +261,12 @@ export interface MyTodos {
   created: Array<{ id: string; title: string; status: ProjectStatus; updatedAt: string }>;
   pendingFeedbacks: number;
   openPullRequests: number;
+  nextAction?: {
+    title: string;
+    reason: string;
+    href: string;
+    primaryLabel: string;
+  };
 }
 
 /** 开发者信息 */

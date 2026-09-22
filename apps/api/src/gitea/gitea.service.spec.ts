@@ -118,3 +118,64 @@ describe('GiteaService.request', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('GiteaService 成果读取', () => {
+  it('读取并解码仓库 README', async () => {
+    const service = createService();
+    jest.spyOn(service, 'request').mockResolvedValue({
+      type: 'file',
+      content: Buffer.from('# 月度报表工具', 'utf8').toString('base64'),
+      html_url: 'http://git.example.com/projects/monthly-report/src/branch/main/README.md',
+    });
+
+    await expect(service.getRepositoryReadme('projects', 'monthly-report')).resolves.toEqual({
+      path: 'README.md',
+      content: '# 月度报表工具',
+      htmlUrl: 'http://git.example.com/projects/monthly-report/src/branch/main/README.md',
+    });
+  });
+
+  it('按约定路径读取使用教程，缺失时返回 null', async () => {
+    const service = createService();
+    const request = jest
+      .spyOn(service, 'request')
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        type: 'file',
+        content: Buffer.from('## 使用步骤', 'utf8').toString('base64'),
+        html_url: 'http://git.example.com/docs/README.md',
+      });
+
+    await expect(service.getRepositoryTutorial('projects', 'monthly-report')).resolves.toEqual({
+      path: 'docs/README.md',
+      content: '## 使用步骤',
+      htmlUrl: 'http://git.example.com/docs/README.md',
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('把 Release 资产整理成成果下载数据', async () => {
+    const service = createService();
+    jest.spyOn(service, 'request').mockResolvedValue([
+      {
+        id: 1,
+        tag_name: 'v1.0.0',
+        name: '首个版本',
+        html_url: 'http://git.example.com/releases/v1.0.0',
+        published_at: '2026-09-22T00:00:00.000Z',
+        assets: [{ id: 2, name: 'tool.zip', size: 12, browser_download_url: 'http://git.example.com/tool.zip' }],
+      },
+    ]);
+
+    await expect(service.listReleaseDownloads('projects', 'monthly-report')).resolves.toEqual([
+      {
+        id: 1,
+        tag: 'v1.0.0',
+        name: '首个版本',
+        htmlUrl: 'http://git.example.com/releases/v1.0.0',
+        publishedAt: '2026-09-22T00:00:00.000Z',
+        assets: [{ id: 2, name: 'tool.zip', size: 12, downloadUrl: 'http://git.example.com/tool.zip' }],
+      },
+    ]);
+  });
+});

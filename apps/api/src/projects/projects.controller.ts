@@ -7,12 +7,18 @@ import {
   AddRequesterDto,
   ClaimProjectDto,
   CreateProjectDto,
+  CreateProjectUpdateDto,
+  CreateRepositoryDto,
   ListProjectsQueryDto,
+  NudgeProjectDto,
+  ReturnProjectDto,
+  SubmitAcceptanceDto,
   UpdateProjectDto,
   UpdateProjectStatusDto,
 } from './dto/projects.dto';
 import { ProjectsService } from './projects.service';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -51,11 +57,36 @@ export class ProjectsController {
     return this.projectsService.myTodos(userId);
   }
 
+  /** 项目沟通与追加需求 */
+  @Get(':id/updates')
+  @ApiOperation({ summary: '查询项目沟通与追加需求记录' })
+  listUpdates(@Param('id') id: string) {
+    return this.projectsService.listUpdates(id);
+  }
+
+  /** 新增项目沟通或追加需求 */
+  @Post(':id/updates')
+  @ApiOperation({ summary: '新增项目沟通或追加需求' })
+  createUpdate(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateProjectUpdateDto,
+  ) {
+    return this.projectsService.createUpdate(id, user, dto);
+  }
+
   /** 项目详情 */
   @Get(':id')
   @ApiOperation({ summary: '查询项目详情（含成员、PR、认领记录）' })
-  getById(@Param('id') id: string) {
-    return this.projectsService.getById(id);
+  getById(@Param('id') id: string, @Query() query: PaginationQueryDto) {
+    return this.projectsService.getById(id, query);
+  }
+
+  /** 查询项目成果：README、使用教程、展示地址与 Release 下载 */
+  @Get(':id/deliverables')
+  @ApiOperation({ summary: '查询项目成果展示数据' })
+  getDeliverables(@Param('id') id: string) {
+    return this.projectsService.getDeliverables(id);
   }
 
   /** 修改需求内容 */
@@ -75,8 +106,12 @@ export class ProjectsController {
   /** 创建或修复项目仓库 */
   @Post(':id/repository')
   @ApiOperation({ summary: '创建/修复项目仓库（负责人或管理员）' })
-  ensureRepository(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.projectsService.ensureRepository(id, user);
+  ensureRepository(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateRepositoryDto,
+  ) {
+    return this.projectsService.ensureRepository(id, user, dto);
   }
 
   /** 同步仓库 Pull Request */
@@ -97,11 +132,39 @@ export class ProjectsController {
     return this.projectsService.updateStatus(id, user, dto);
   }
 
+  /** 将误认领或无法继续的需求交还需求池 */
+  @Post(':id/return')
+  @ApiOperation({ summary: '交还需求池，保留仓库与认领历史' })
+  returnToPool(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() dto: ReturnProjectDto) {
+    return this.projectsService.returnToPool(id, user, dto);
+  }
+
+  /** 需求方提交试用验收结果 */
+  @Post(':id/acceptance')
+  @ApiOperation({ summary: '提交逐条试用验收结果' })
+  submitAcceptance(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() dto: SubmitAcceptanceDto) {
+    return this.projectsService.submitAcceptance(id, user, dto);
+  }
+
+  /** 需求方催办项目 */
+  @Post(':id/nudge')
+  @ApiOperation({ summary: '催办项目负责人或提醒管理员' })
+  nudge(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() dto: NudgeProjectDto) {
+    return this.projectsService.nudge(id, user, dto);
+  }
+
   /** 添加协作者 */
   @Post(':id/members')
   @ApiOperation({ summary: '添加项目协作者，并同步仓库权限' })
   addMember(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() dto: AddMemberDto) {
     return this.projectsService.addMember(id, user, dto);
+  }
+
+  /** 当前用户自助加入项目开发 */
+  @Post(':id/join')
+  @ApiOperation({ summary: '当前用户自助加入项目开发，成为协作者' })
+  joinMember(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.projectsService.joinMember(id, user);
   }
 
   /** 移除协作者 */

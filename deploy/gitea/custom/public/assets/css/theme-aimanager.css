@@ -1,0 +1,143 @@
+/*
+ * Gitea 1.22 品牌主题
+ * 作用：让代码库、Issue、PR 与平台使用同一套暖色纸张视觉；不改变 Gitea 业务行为。
+ */
+:root {
+  --aimanager-parchment: #f7f7f4;
+  --aimanager-bone: #f2f1ed;
+  --aimanager-linen: #e6e5e0;
+  --aimanager-stone: #cdcdc9;
+  --aimanager-ash: #7a7974;
+  --aimanager-ink: #26251e;
+  --aimanager-ember: #f54e00;
+  --aimanager-forest: #34785c;
+}
+
+html,
+body,
+.page-content {
+  background: var(--aimanager-parchment) !important;
+  color: var(--aimanager-ink) !important;
+}
+
+body,
+input,
+textarea,
+select,
+button {
+  font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+a,
+.ui a {
+  color: var(--aimanager-ember) !important;
+}
+
+a:hover,
+.ui a:hover {
+  color: var(--aimanager-ink) !important;
+}
+
+.ui.segment,
+.ui.segments,
+.ui.card,
+.ui.cards > .card,
+.repository .ui.attached.segment {
+  background: var(--aimanager-bone) !important;
+  border: 1px solid color-mix(in oklab, var(--aimanager-ink) 9%, transparent) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
+.ui.button,
+.ui.buttons .button,
+input,
+textarea,
+select,
+.ui.selection.dropdown {
+  border-radius: 4px !important;
+}
+
+.ui.primary.button,
+.ui.primary.buttons .button {
+  color: var(--aimanager-parchment) !important;
+  background: var(--aimanager-ink) !important;
+  border-color: var(--aimanager-ink) !important;
+}
+
+.ui.primary.button:hover,
+.ui.primary.buttons .button:hover {
+  background: var(--aimanager-forest) !important;
+  border-color: var(--aimanager-forest) !important;
+}
+
+.ui.basic.button {
+  color: var(--aimanager-ink) !important;
+  background: var(--aimanager-linen) !important;
+  border-color: var(--aimanager-stone) !important;
+}
+
+.ui.menu,
+.ui.secondary.menu,
+.ui.top.menu {
+  background: transparent !important;
+  border-color: var(--aimanager-stone) !important;
+}
+
+.ui.menu .item,
+.ui.menu .item > a {
+  color: var(--aimanager-ash) !important;
+}
+
+.ui.menu .active.item,
+.ui.menu .item:hover {
+  color: var(--aimanager-ink) !important;
+  background: var(--aimanager-linen) !important;
+}
+
+.ui.label {
+  border-radius: 4px !important;
+  color: var(--aimanager-ink) !important;
+  background: var(--aimanager-linen) !important;
+}
+
+.ui.divider {
+  border-color: var(--aimanager-stone) !important;
+}
+
+.aimanager-signin-intro {
+  border-left: 4px solid var(--aimanager-forest) !important;
+}
+
+.aimanager-signin-intro h3 {
+  margin: 6px 0 10px;
+  color: var(--aimanager-ink);
+  font-weight: 400;
+}
+
+.aimanager-signin-intro p {
+  color: var(--aimanager-ash);
+  line-height: 1.6;
+}
+
+.aimanager-eyebrow {
+  color: var(--aimanager-ash);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.repository .header-wrapper,
+.repository .ui.tabs {
+  background: var(--aimanager-bone) !important;
+  border-color: var(--aimanager-stone) !important;
+}
+
+code,
+pre,
+.repository.file.list,
+.file-view,
+.commit-status,
+.ui.monospace {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}

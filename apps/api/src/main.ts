@@ -8,6 +8,8 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NextFunction, Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 
 /**
  * 启动 HTTP 服务
@@ -22,6 +24,14 @@ async function bootstrap(): Promise<void> {
 
   // 统一 API 前缀
   app.setGlobalPrefix('api');
+
+  // 为 CLI / MCP 请求补充可追踪的 request id
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    const requestId = request.header('x-request-id')?.slice(0, 100) || randomUUID();
+    request.headers['x-request-id'] = requestId;
+    response.setHeader('x-request-id', requestId);
+    next();
+  });
 
   // 全局参数校验与类型转换
   app.useGlobalPipes(

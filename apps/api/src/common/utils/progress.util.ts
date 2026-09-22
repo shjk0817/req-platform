@@ -6,7 +6,7 @@ import { ProjectStatus } from '@prisma/client';
 
 /** 各阶段的基础完成度（%） */
 const STAGE_PROGRESS: Record<ProjectStatus, number> = {
-  OPEN: 10, // 已发布，等待认领
+  OPEN: 0, // 已发布，等待认领
   CLAIMED: 35, // 已认领，准备开发
   DEVELOPING: 55, // 开发中：55% 起步
   RELEASED: 100, // 已交付

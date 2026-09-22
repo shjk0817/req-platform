@@ -9,8 +9,8 @@ WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
 
 # 先安装依赖，充分利用镜像层缓存
-COPY package.json ./
-RUN npm install --no-audit --no-fund
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 # 生成 Prisma Client（需要 schema）
 COPY prisma ./prisma
@@ -30,8 +30,8 @@ ENV NODE_ENV=production
 RUN apk add --no-cache openssl libc6-compat
 
 # 安装生产依赖（prisma CLI 在 dependencies 中，用于执行数据库迁移）
-COPY package.json ./
-RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
 # 复用已生成的 Prisma Client
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma

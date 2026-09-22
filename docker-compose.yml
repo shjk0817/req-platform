@@ -100,6 +100,9 @@ services:
       GITEA__security__INSTALL_LOCK: "true"
       # 首页落地页：匿名访问直接进登录页（配合自定义登录页引导回平台）
       GITEA__server__LANDING_PAGE: login
+      # 使用 deploy/gitea/custom/public/assets/css/theme-aimanager.css
+      GITEA__ui__DEFAULT_THEME: aimanager
+      GITEA__ui__THEMES: gitea,arc-green,aimanager
       # 免密登录（平台 SSO）：信任 Caddy forward_auth 透传的用户名请求头
       GITEA__service__ENABLE_REVERSE_PROXY_AUTHENTICATION: "true"
       GITEA__service__ENABLE_REVERSE_PROXY_AUTO_REGISTRATION: "true"
@@ -175,7 +178,6 @@ services:
       redis:
         condition: service_healthy
     environment:
-      NODE_ENV: production
       PORT: "4000"
       TZ: ${TZ:-Asia/Shanghai}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
@@ -184,6 +186,11 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      # 开发环境账号选择器只返回 ACTIVE 账号与开发密码，生产环境接口会拒绝
+      NODE_ENV: ${NODE_ENV:-production}
+      DEV_USER_PICKER_ENABLED: ${DEV_USER_PICKER_ENABLED:-false}
+      DEV_PICKER_ADMIN_PASSWORD: ${DEV_PICKER_ADMIN_PASSWORD:-Admin@123456}
+      DEV_PICKER_USER_PASSWORD: ${DEV_PICKER_USER_PASSWORD:-Demo@123456}
       # 初始管理员（仅在平台无任何管理员时创建）
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@aimanager.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@123456}
@@ -203,8 +210,8 @@ services:
       SELF_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
       # 附件与图片存储目录（由 uploads-data 卷持久化）
       UPLOAD_DIR: /app/uploads
-      UPLOAD_IMAGE_MAX_MB: ${UPLOAD_IMAGE_MAX_MB:-10}
-      UPLOAD_FILE_MAX_MB: ${UPLOAD_FILE_MAX_MB:-30}
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-100}
+      AVATAR_MAX_MB: ${AVATAR_MAX_MB:-5}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-465}
@@ -218,6 +225,24 @@ services:
     networks:
       - backend
 
+  # ---------------- 远程 MCP：供标准 MCP 客户端调用平台能力 ----------------
+  agent-mcp:
+    build:
+      context: ./apps/agent-tools
+      dockerfile: Dockerfile
+    container_name: aimanager-agent-mcp
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      AIMANAGER_API_URL: http://api:4000/api
+      AIMANAGER_GITEA_URL: ${GITEA_ROOT_URL}
+      AIM_MCP_PORT: ${AIM_MCP_PORT:-4100}
+    networks:
+      - backend
+
   # ---------------- 平台前端：Next.js ----------------
   web:
     build:
@@ -225,6 +250,9 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_DEV_USER_PICKER: ${DEV_USER_PICKER_ENABLED:-false}
+        NEXT_PUBLIC_UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-100}
+        NEXT_PUBLIC_AVATAR_MAX_MB: ${AVATAR_MAX_MB:-5}
     container_name: aimanager-web
     restart: unless-stopped
     depends_on:
@@ -235,6 +263,9 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
       # 浏览器通过同域 /api 访问后端（由 Caddy 转发）
       NEXT_PUBLIC_API_URL: /api
+      NEXT_PUBLIC_DEV_USER_PICKER: ${DEV_USER_PICKER_ENABLED:-false}
+      NEXT_PUBLIC_UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-100}
+      NEXT_PUBLIC_AVATAR_MAX_MB: ${AVATAR_MAX_MB:-5}
       API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:4000}
       APP_URL: ${APP_URL}
     networks:

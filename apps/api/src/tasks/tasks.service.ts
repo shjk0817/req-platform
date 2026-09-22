@@ -37,10 +37,12 @@ export class TasksService {
     for (const project of projects) {
       await this.notifications.create({
         userId: project.creatorId,
-        type: NotificationType.PROJECT_CLAIMED,
+        type: NotificationType.PROJECT_OVERDUE,
         title: `需求「${project.title}」尚未被认领`,
         content: '该需求已发布超过 7 天仍未被认领，建议补充需求细节或联系相关同事。',
         link: `/projects/${project.id}`,
+        sendMail: false,
+        dedupeWindowDays: 7,
       });
     }
     this.logger.log(`已发送 ${projects.length} 条未认领需求提醒`);
@@ -68,6 +70,8 @@ export class TasksService {
         title: `反馈「${feedback.title}」待处理`,
         content: `项目「${feedback.project.title}」中的该反馈已提交超过 3 天，请及时跟进。`,
         link: `/projects/${feedback.project.id}?tab=feedback&feedbackId=${feedback.id}`,
+        sendMail: false,
+        dedupeWindowDays: 7,
       });
     }
     if (feedbacks.length > 0) {

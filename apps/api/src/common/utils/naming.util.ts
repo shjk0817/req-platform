@@ -55,6 +55,29 @@ export function buildRepoName(input: string): string {
 }
 
 /**
+ * 规范化用户手动填写的 Gitea 仓库名
+ * 作用：允许可读英文名，同时在请求 Gitea 前给出明确的中文错误提示
+ * @param input 用户填写的仓库名
+ * @returns 去除首尾空格后的合法仓库名；空输入返回 undefined
+ */
+export function normalizeRepoName(input?: string | null): string | undefined {
+  const value = input?.trim();
+  if (!value) {
+    return undefined;
+  }
+  if (value.length > 100 || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value)) {
+    throw new Error('仓库名只能使用字母、数字、连字符、下划线或点号，且必须以字母或数字开头');
+  }
+  if (value === '.' || value === '..') {
+    throw new Error('仓库名不能是 . 或 ..');
+  }
+  if (/\.git$/i.test(value)) {
+    throw new Error('仓库名不能以 .git 结尾');
+  }
+  return value;
+}
+
+/**
  * 由姓名生成合法的 Gitea 用户名
  * Gitea 用户名只允许字母数字、下划线、连字符，且不能以连字符开头或结尾
  * 中文姓名优先转拼音（张伟 -> zhangwei），拿不到时退回邮箱前缀

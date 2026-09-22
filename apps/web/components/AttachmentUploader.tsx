@@ -65,6 +65,7 @@ export default function AttachmentUploader({ value, onChange, disabled }: Props)
   const images = value?.images ?? [];
   const files = value?.files ?? [];
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const maxUploadMb = process.env.NEXT_PUBLIC_UPLOAD_MAX_MB ?? '100';
 
   /** 上传图片 / 附件：统一走 /uploads 接口 */
   const customRequest: UploadProps['customRequest'] = async (options) => {
@@ -98,7 +99,7 @@ export default function AttachmentUploader({ value, onChange, disabled }: Props)
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <div>
-        <Typography.Text type="secondary">需求图片（支持 jpg/png/gif/webp，单张不超过 10MB，最多 12 张）</Typography.Text>
+        <Typography.Text type="secondary">需求图片（格式不限，单个不超过 {maxUploadMb}MB，最多 12 张）</Typography.Text>
         <div style={{ marginTop: 8 }}>
           <Upload
             listType="picture-card"
@@ -121,7 +122,7 @@ export default function AttachmentUploader({ value, onChange, disabled }: Props)
       </div>
 
       <div>
-        <Typography.Text type="secondary">需求附件（可上传文档、表格、压缩包等，单个不超过 30MB）</Typography.Text>
+        <Typography.Text type="secondary">需求附件（格式不限，单个不超过 {maxUploadMb}MB）</Typography.Text>
         <div style={{ marginTop: 8 }}>
           <Upload
             multiple
@@ -174,7 +175,7 @@ export function AttachmentGallery({
                 alt={item.name}
                 width={120}
                 height={120}
-                style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #f0f0f0' }}
+                style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid #cdcdc9' }}
                 preview={{ mask: <EyeOutlined /> }}
               />
             ))}

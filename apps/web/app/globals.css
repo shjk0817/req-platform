@@ -1,4 +1,29 @@
-/* 全局样式：仅保留必要的重置与布局辅助类 */
+/* 全局样式：平台统一使用暖色纸张视觉，页面组件只在这里消费共享 tokens */
+
+:root {
+  --color-parchment: #f7f7f4;
+  --color-bone: #f2f1ed;
+  --color-linen: #e6e5e0;
+  --color-stone: #cdcdc9;
+  --color-mist: #a1a19f;
+  --color-driftwood: #84847e;
+  --color-ash: #7a7974;
+  --color-ink: #26251e;
+  --color-ember: #f54e00;
+  --color-amber: #c08532;
+  --color-forest: #34785c;
+  --color-verdant: #1f8a65;
+  --color-crimson: #cf2d56;
+  --surface-canvas: var(--color-parchment);
+  --surface-card: var(--color-bone);
+  --surface-elevated: var(--color-linen);
+  --surface-outline: var(--color-stone);
+  --font-cursorgothic: 'CursorGothic', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif;
+  --font-eb-garamond: 'EB Garamond', ui-serif, Georgia, serif;
+  --font-berkeleymono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --shadow-xl: rgba(0, 0, 0, 0.14) 0 28px 70px, rgba(0, 0, 0, 0.1) 0 14px 32px;
+  --shadow-subtle: 0 0 0 1px color-mix(in oklab, var(--color-ink) 8%, transparent);
+}
 
 * {
   box-sizing: border-box;
@@ -12,16 +37,18 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
-  background: #f5f6fa;
+  font-family: var(--font-cursorgothic);
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-feature-settings: 'ss08', 'ss09', 'tnum';
 }
 
 /* 主内容区域内边距 */
 .page-container {
-  padding: 20px 24px 40px;
-  max-width: 1400px;
+  padding: 8px 24px 48px;
+  max-width: 1300px;
   margin: 0 auto;
+  width: 100%;
 }
 
 /* 卡片间距 */
@@ -31,7 +58,7 @@ body {
 
 /* 描述型文本 */
 .text-muted {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--color-driftwood);
   font-size: 13px;
 }
 
@@ -63,6 +90,34 @@ body {
   box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.06);
 }
 
+/* 自定义头像上传区：与预览稿保持一致，隐藏浏览器原生文件输入 */
+.avatar-upload-dropzone {
+  display: flex;
+  width: min(100%, 420px);
+  min-height: 128px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  border: 1px dashed color-mix(in oklab, var(--color-forest) 45%, var(--color-stone));
+  border-radius: 4px;
+  color: var(--color-forest);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.avatar-upload-dropzone:hover,
+.avatar-upload-dropzone:focus-visible {
+  border-color: var(--color-forest);
+  background: color-mix(in oklab, var(--color-forest) 6%, transparent);
+  outline: none;
+}
+
+.avatar-upload-icon {
+  font-size: 24px;
+}
+
 .avatar-picker-item {
   position: relative;
   display: inline-flex;
@@ -82,8 +137,8 @@ body {
 }
 
 .avatar-picker-item.is-active {
-  border-color: #1677ff;
-  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.18);
+  border-color: var(--color-forest);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-forest) 18%, transparent);
 }
 
 .avatar-picker-check {
@@ -93,7 +148,7 @@ body {
   padding: 2px;
   color: #fff;
   font-size: 10px;
-  background: #1677ff;
+  background: var(--color-forest);
   border-radius: 50%;
 }
 
@@ -153,7 +208,7 @@ body {
 }
 
 .heatmap-cell.is-today {
-  outline: 1px solid #1677ff;
+  outline: 1px solid var(--color-forest);
   outline-offset: 1px;
 }
 
@@ -261,5 +316,526 @@ body {
   display: inline-block;
   margin-top: 4px;
   font-size: 12px;
-  color: #1677ff;
+  color: var(--color-ember);
+}
+
+/* ---------------- 小白引导与下一步 ---------------- */
+.next-action-card {
+  border: 1px solid color-mix(in oklab, var(--color-forest) 30%, var(--color-stone));
+  background: var(--surface-card);
+}
+
+.guide-popover {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  width: min(360px, calc(100vw - 32px));
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
+}
+
+.guide-reopen {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+}
+
+.guide-list {
+  margin: 0;
+  padding-left: 20px;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.guide-list li + li {
+  margin-top: 8px;
+}
+
+.wizard-preview {
+  position: sticky;
+  top: 20px;
+  background: #fafcff;
+}
+
+@media (max-width: 767px) {
+  .page-container {
+    padding: 16px 12px 96px;
+  }
+
+  .guide-popover,
+  .guide-reopen {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .wizard-preview {
+    position: static;
+  }
+
+  .developer-details {
+    display: none;
+  }
+
+  .ant-steps.ant-steps-horizontal {
+    overflow-x: auto;
+  }
+}
+
+/* ---------------- 暖色编辑型平台外壳 ---------------- */
+.app-layout {
+  min-height: 100vh;
+  background: var(--surface-canvas);
+}
+
+.app-layout .ant-layout {
+  background: transparent;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  height: 64px;
+  padding: 0 24px;
+  background: color-mix(in srgb, var(--surface-canvas) 94%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--color-ink) 8%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.app-brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 190px;
+}
+
+.app-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--color-parchment);
+  background: var(--color-ink);
+  border-radius: 4px;
+  font-family: var(--font-eb-garamond);
+  font-size: 20px;
+}
+
+.app-brand-name,
+.app-brand-kicker {
+  display: block;
+}
+
+.app-brand-name {
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.app-brand-kicker,
+.page-heading-kicker {
+  color: var(--color-ash);
+  font-family: var(--font-berkeleymono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+}
+
+.top-nav-menu {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border-bottom: 0;
+}
+
+.top-nav-menu .ant-menu-item {
+  color: var(--color-driftwood);
+}
+
+.top-nav-menu .ant-menu-item-selected {
+  color: var(--color-ink) !important;
+  font-weight: 500;
+}
+
+.top-nav-menu .ant-menu-item-selected::after {
+  border-bottom-color: var(--color-forest) !important;
+}
+
+.header-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.code-repository-button {
+  color: var(--color-driftwood);
+}
+
+.code-repository-button:hover,
+.code-repository-button:focus-visible {
+  color: var(--color-ember) !important;
+  background: transparent !important;
+}
+
+.user-menu-trigger {
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.user-menu-trigger:hover {
+  background: var(--surface-elevated);
+}
+
+.user-menu-name {
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.user-menu-role {
+  color: var(--color-ash);
+  font-family: var(--font-berkeleymono);
+  font-size: 11px;
+}
+
+.mobile-nav-trigger {
+  display: none;
+}
+
+.app-content {
+  min-height: calc(100vh - 64px);
+}
+
+.page-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 24px 24px 0;
+}
+
+.page-heading .ant-typography {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+
+.app-layout .ant-card {
+  color: var(--color-ink);
+  background: var(--surface-card);
+  border-color: color-mix(in oklab, var(--color-ink) 8%, transparent);
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.app-layout .ant-card-hoverable:hover {
+  border-color: color-mix(in oklab, var(--color-ink) 18%, transparent);
+  box-shadow: var(--shadow-xl);
+  transform: translateY(-2px);
+}
+
+.app-layout .ant-btn {
+  border-radius: 4px;
+  font-weight: 400;
+}
+
+.app-layout .ant-btn-primary {
+  color: var(--color-parchment);
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+}
+
+.app-layout .ant-btn-primary:hover,
+.app-layout .ant-btn-primary:focus-visible {
+  color: var(--color-parchment) !important;
+  background: var(--color-forest) !important;
+  border-color: var(--color-forest) !important;
+}
+
+.app-layout .ant-btn-default {
+  color: var(--color-ink);
+  background: var(--surface-elevated);
+  border-color: var(--color-stone);
+}
+
+.app-layout .ant-input,
+.app-layout .ant-input-affix-wrapper,
+.app-layout .ant-select-selector,
+.app-layout .ant-picker {
+  border-radius: 4px !important;
+  border-color: var(--color-stone) !important;
+  background: var(--surface-canvas) !important;
+}
+
+.app-layout .ant-input:focus,
+.app-layout .ant-input-affix-wrapper-focused,
+.app-layout .ant-select-focused .ant-select-selector,
+.app-layout .ant-picker-focused {
+  border-color: var(--color-forest) !important;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-forest) 14%, transparent) !important;
+}
+
+.app-layout .ant-typography a,
+.app-layout a {
+  color: var(--color-ember);
+}
+
+.app-layout a:hover {
+  color: var(--color-ink);
+}
+
+/* ---------------- 登录与注册 ---------------- */
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--surface-canvas);
+}
+
+.auth-page-tall {
+  padding: 48px 24px;
+}
+
+.auth-card {
+  width: min(100%, 460px) !important;
+  background: var(--surface-card);
+  border: 1px solid var(--color-stone);
+  border-radius: 4px;
+  box-shadow: var(--shadow-xl);
+}
+
+.auth-card .ant-card-body {
+  padding: 32px;
+}
+
+.auth-card .ant-typography h3,
+.auth-card .ant-typography.ant-typography {
+  color: var(--color-ink);
+  font-weight: 400;
+}
+
+.next-action-card {
+  border-color: color-mix(in oklab, var(--color-forest) 30%, var(--color-stone));
+  background: var(--surface-card);
+}
+
+.next-action-card .ant-card-head-title {
+  color: var(--color-forest);
+  font-family: var(--font-berkeleymono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.stat-card-hint {
+  color: var(--color-ember);
+}
+
+.project-card {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--color-ink) 10%, transparent);
+}
+
+.project-card-clickable {
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.project-card-clickable:hover,
+.project-card-clickable:focus-visible {
+  border-color: color-mix(in oklab, var(--color-ink) 18%, transparent);
+  box-shadow: var(--shadow-xl);
+  transform: translateY(-2px);
+}
+
+.project-card-clickable:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
+}
+
+.markdown-image {
+  display: block;
+  max-width: min(100%, 720px);
+  max-height: 480px;
+  margin: 12px 0;
+  border: 1px solid var(--color-stone);
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.project-card .ant-card-body {
+  gap: 12px;
+}
+
+.project-card-hint {
+  display: none;
+}
+
+.project-card-layer {
+  padding: 10px 12px;
+  background: var(--surface-elevated);
+  border: 1px solid color-mix(in oklab, var(--color-ink) 8%, transparent);
+  border-radius: 4px;
+}
+
+.project-card-action-layer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.project-card-detail-link {
+  flex: 0 0 auto;
+  color: var(--color-ember);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.project-card-alias {
+  color: var(--color-ash);
+  font-family: var(--font-berkeleymono);
+  font-size: 11px;
+}
+
+.mono-meta {
+  font-family: var(--font-berkeleymono);
+  font-size: 11px;
+}
+
+.markdown-content {
+  color: var(--color-ink);
+  font-family: var(--font-eb-garamond);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  margin: 20px 0 8px;
+  color: var(--color-ink);
+  font-family: var(--font-cursorgothic);
+  font-weight: 400;
+}
+
+.markdown-content h2 {
+  font-size: 24px;
+}
+
+.markdown-content h3 {
+  font-size: 20px;
+}
+
+.markdown-content h4 {
+  font-size: 17px;
+}
+
+.markdown-content p {
+  margin: 0 0 8px;
+}
+
+.markdown-content li {
+  margin: 4px 0 4px 20px;
+}
+
+.markdown-content a {
+  color: var(--color-ember);
+  overflow-wrap: anywhere;
+}
+
+.markdown-code-line {
+  display: block;
+  padding: 2px 10px;
+  color: var(--color-ink);
+  background: var(--surface-elevated);
+  font-family: var(--font-berkeleymono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.markdown-spacer {
+  height: 8px;
+}
+
+.guide-popover {
+  border: 1px solid var(--color-stone);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-xl);
+}
+
+.guide-reopen {
+  color: var(--color-ink);
+  background: var(--surface-elevated);
+  border-color: var(--color-stone);
+}
+
+.wizard-preview {
+  background: var(--surface-card);
+  border-color: var(--color-stone);
+}
+
+@media (max-width: 1023px) {
+  .app-header {
+    gap: 16px;
+  }
+
+  .app-brand {
+    min-width: auto;
+  }
+
+  .top-nav-menu,
+  .code-repository-button,
+  .user-menu-name,
+  .user-menu-role {
+    display: none;
+  }
+
+  .header-actions {
+    margin-left: auto;
+  }
+
+  .mobile-nav-trigger {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-header {
+    height: 56px;
+    padding: 0 14px;
+  }
+
+  .app-brand-name {
+    font-size: 13px;
+  }
+
+  .app-brand-kicker {
+    display: none;
+  }
+
+  .app-content {
+    min-height: calc(100vh - 56px);
+  }
+
+  .page-heading {
+    padding: 18px 12px 0;
+  }
+
+  .page-heading .ant-typography {
+    font-size: 18px;
+  }
 }

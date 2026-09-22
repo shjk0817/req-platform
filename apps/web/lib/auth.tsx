@@ -37,6 +37,18 @@ export interface RegisterPayload {
   skills?: string[];
 }
 
+/** 开发账号选择器开关，由 Next.js 构建时环境变量注入 */
+export const DEV_USER_PICKER_ENABLED = process.env.NEXT_PUBLIC_DEV_USER_PICKER === 'true';
+
+/** 开发账号选择器展示的数据 */
+export interface DevPickerUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'ADMIN' | 'EMPLOYEE';
+  password: string;
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /** 登录态提供者，需包裹在应用最外层 */

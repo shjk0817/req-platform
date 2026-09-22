@@ -7,6 +7,7 @@ import { AuthProvider } from '@/lib/auth';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { ConfigProvider } from 'antd';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,9 +20,30 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="zh-CN">
       <body>
         <AntdRegistry>
-          <AuthProvider>
-            <AppShell>{children}</AppShell>
-          </AuthProvider>
+          <ConfigProvider
+            theme={{
+              token: {
+                colorPrimary: '#34785c',
+                colorInfo: '#34785c',
+                colorSuccess: '#34785c',
+                colorWarning: '#c08532',
+                colorError: '#cf2d56',
+                colorText: '#26251e',
+                colorTextSecondary: '#84847e',
+                colorBgBase: '#f7f7f4',
+                colorBgContainer: '#f2f1ed',
+                colorBorder: '#cdcdc9',
+                borderRadius: 4,
+                borderRadiusLG: 8,
+                fontFamily:
+                  "'CursorGothic', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif",
+              },
+            }}
+          >
+            <AuthProvider>
+              <AppShell>{children}</AppShell>
+            </AuthProvider>
+          </ConfigProvider>
         </AntdRegistry>
       </body>
     </html>

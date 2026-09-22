@@ -12,11 +12,14 @@ import { useAuth } from '@/lib/auth';
 import { PROJECT_PROGRESS_COLOR, PROJECT_STATUS_MAP, formatTime } from '@/lib/labels';
 import type { Paginated, Project, ProjectStatus } from '@/lib/types';
 import {
+  CheckOutlined,
   FileTextOutlined,
   PlusCircleOutlined,
   ReloadOutlined,
   SearchOutlined,
   TeamOutlined,
+  ToolOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons';
 import {
   Button,
@@ -45,8 +48,8 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 /** 范围筛选选项 */
 const SCOPE_OPTIONS = [
   { label: '全部', value: 'all' },
-  { label: '待认领', value: 'unclaimed' },
-  { label: '开发中', value: 'developing' },
+  { label: '等同事接手', value: 'unclaimed' },
+  { label: '正在做', value: 'developing' },
   { label: '我参与的', value: 'mine' },
   { label: '我提出的', value: 'created' },
   { label: '我关注的', value: 'requesting' },
@@ -54,11 +57,11 @@ const SCOPE_OPTIONS = [
 
 /** 状态筛选选项 */
 const STATUS_OPTIONS: Array<{ label: string; value: ProjectStatus }> = [
-  { label: '待认领', value: 'OPEN' },
-  { label: '已认领', value: 'CLAIMED' },
-  { label: '开发中', value: 'DEVELOPING' },
-  { label: '已发布', value: 'RELEASED' },
-  { label: '已关闭', value: 'CLOSED' },
+  { label: '等同事接手', value: 'OPEN' },
+  { label: '已有人接手', value: 'CLAIMED' },
+  { label: '正在做', value: 'DEVELOPING' },
+  { label: '请你试用', value: 'RELEASED' },
+  { label: '已结束', value: 'CLOSED' },
 ];
 
 /** 需求池内容（独立组件以便读取查询参数） */
@@ -71,16 +74,17 @@ function ProjectsContent() {
   const [status, setStatus] = useState<ProjectStatus | undefined>(
     (searchParams.get('status') as ProjectStatus | null) ?? undefined,
   );
-  const [keyword, setKeyword] = useState('');
+  const [keyword, setKeyword] = useState(searchParams.get('keyword') ?? '');
+  const [debouncedKeyword, setDebouncedKeyword] = useState(searchParams.get('keyword') ?? '');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(9);
+  const [pageSize, setPageSize] = useState(12);
   const [data, setData] = useState<Paginated<Project> | null>(null);
   const [loading, setLoading] = useState(false);
   const [joiningId, setJoiningId] = useState<string | null>(null);
 
   // 认领弹窗
   const [claimTarget, setClaimTarget] = useState<Project | null>(null);
-  const [claimForm] = Form.useForm<{ remark?: string }>();
+  const [claimForm] = Form.useForm<{ remark?: string; repoName?: string; repoDisplayName?: string }>();
   const [claiming, setClaiming] = useState(false);
 
   /** 加载需求列表 */
@@ -92,7 +96,7 @@ function ProjectsContent() {
         pageSize,
         status,
         scope: scope === 'all' ? undefined : scope,
-        keyword,
+        keyword: debouncedKeyword,
       });
       setData(result);
     } catch (error) {
@@ -100,11 +104,32 @@ function ProjectsContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, status, scope, keyword]);
+  }, [page, pageSize, status, scope, debouncedKeyword]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** 搜索输入短暂停止后再请求，避免每输入一个字都刷新列表 */
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedKeyword(keyword);
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [keyword]);
+
+  /** 把筛选条件写回地址，刷新或复制链接后仍保留当前视图 */
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (scope !== 'all') params.set('scope', scope);
+    if (status) params.set('status', status);
+    if (debouncedKeyword) params.set('keyword', debouncedKeyword);
+    if (page > 1) params.set('page', String(page));
+    if (pageSize !== 12) params.set('pageSize', String(pageSize));
+    const query = params.toString();
+    router.replace(query ? `/projects?${query}` : '/projects', { scroll: false });
+  }, [debouncedKeyword, page, pageSize, router, scope, status]);
 
   /** 提交认领 */
   const submitClaim = async () => {
@@ -165,7 +190,7 @@ function ProjectsContent() {
             需求池
           </Typography.Title>
           <Typography.Text type="secondary">
-            浏览同事提出的需求，选择你擅长的方向认领；有同样的诉求时也可以点击「我也需要」一起推进
+            浏览同事提出的需求，选择你愿意一起推进的项目；有同样的诉求时也可以点击「我也需要」
           </Typography.Text>
         </div>
         <Space>
@@ -206,16 +231,8 @@ function ProjectsContent() {
             placeholder="搜索标题或描述"
             prefix={<SearchOutlined />}
             style={{ width: 240 }}
-            onPressEnter={(event) => {
-              setKeyword((event.target as HTMLInputElement).value);
-              setPage(1);
-            }}
-            onChange={(event) => {
-              if (!event.target.value) {
-                setKeyword('');
-                setPage(1);
-              }
-            }}
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
           />
         </Space>
       </Card>
@@ -223,7 +240,19 @@ function ProjectsContent() {
       <Spin spinning={loading}>
         {(data?.items ?? []).length === 0 ? (
           <Card>
-            <Empty description="没有符合条件的需求，换个筛选条件试试" />
+            <Empty
+              description={
+                data?.total === 0 && scope === 'all' && !debouncedKeyword
+                  ? '还没有需求。你可以写下工作里反复手工做的事。'
+                  : '没有符合条件的需求，换个筛选条件试试'
+              }
+            >
+              {data?.total === 0 && scope === 'all' && !debouncedKeyword ? (
+                <Link href="/projects/new">
+                  <Button type="primary">写下一条需求</Button>
+                </Link>
+              ) : null}
+            </Empty>
           </Card>
         ) : (
           <Row gutter={[16, 16]}>
@@ -231,69 +260,81 @@ function ProjectsContent() {
               const requesters = project.requesters ?? [];
               const isCreator = project.creator?.id === user?.id;
               const joined = requesters.some((item) => item.user.id === user?.id);
-              const canClaim = project.status === 'OPEN' && project.creatorId !== user?.id;
+              const canClaim = project.status === 'OPEN' && project.ownerId !== user?.id;
               const progress = project.progress ?? 0;
 
               return (
-                <Col key={project.id} xs={24} sm={12} lg={8} xxl={6}>
+                <Col key={project.id} xs={24} sm={12} lg={6}>
                   <Card
-                    hoverable
-                    className="project-card"
+                    className="project-card project-card-clickable"
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`查看需求：${project.title}`}
                     onClick={() => router.push(`/projects/${project.id}`)}
-                    style={{ cursor: 'pointer' }}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) {
+                        return;
+                      }
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        router.push(`/projects/${project.id}`);
+                      }
+                    }}
                     styles={{ body: { padding: 16, height: '100%', display: 'flex', flexDirection: 'column' } }}
                   >
-                    <Space align="start" size={12} style={{ width: '100%' }}>
-                      {/* 圆环进度：状态文字放在圆环中间 */}
-                      <Tooltip title={`完成进度 ${progress}%`}>
-                        <Progress
-                          type="circle"
-                          size={78}
-                          percent={progress}
-                          strokeColor={PROJECT_PROGRESS_COLOR[project.status]}
-                          strokeWidth={8}
-                          format={() => (
-                            <span className="project-ring-text">
-                              <span className="project-ring-status">
-                                {PROJECT_STATUS_MAP[project.status]?.text ?? project.status}
+                    <div className="project-card-layer">
+                      <Space align="start" size={12} style={{ width: '100%' }}>
+                        {/* 圆环进度：状态文字放在圆环中间 */}
+                        <Tooltip title={`完成进度 ${progress}%`}>
+                          <Progress
+                            type="circle"
+                            size={78}
+                            percent={progress}
+                            strokeColor={PROJECT_PROGRESS_COLOR[project.status]}
+                            strokeWidth={8}
+                            format={() => (
+                              <span className="project-ring-text">
+                                <span className="project-ring-status">
+                                  {PROJECT_STATUS_MAP[project.status]?.text ?? project.status}
+                                </span>
+                                <span className="project-ring-percent">{progress}%</span>
                               </span>
-                              <span className="project-ring-percent">{progress}%</span>
-                            </span>
-                          )}
-                        />
-                      </Tooltip>
-
-                      <Space direction="vertical" size={4} style={{ flex: 1, minWidth: 0 }}>
-                        <Space size={6} align="start">
-                          <AvatarBadge
-                            kind="task"
-                            value={project.avatar}
-                            name={project.title}
-                            size={30}
-                            tooltip={`任务头像：${project.title}`}
+                            )}
                           />
-                          <Link
-                            href={`/projects/${project.id}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
+                        </Tooltip>
+
+                        <Space direction="vertical" size={4} style={{ flex: 1, minWidth: 0 }}>
+                          <Space size={6} align="start">
+                            <AvatarBadge
+                              kind="task"
+                              value={project.avatar}
+                              name={project.title}
+                              size={30}
+                              tooltip={`任务头像：${project.title}`}
+                            />
                             <Typography.Text strong className="project-card-title">
                               {project.title}
                             </Typography.Text>
-                          </Link>
-                        </Space>
-                        <Space size={8} wrap className="text-muted">
-                          <span>
-                            <FileTextOutlined /> 反馈 {project._count?.feedbacks ?? 0}
-                          </span>
-                          <span>
-                            <TeamOutlined /> PR {project._count?.pullReqs ?? 0}
-                          </span>
-                          {project.attachmentCount ? (
-                            <span title="需求带图片或附件">📎 {project.attachmentCount}</span>
-                          ) : null}
+                            {project.repoDisplayName && (
+                              <Typography.Text className="project-card-alias">
+                                代码库：{project.repoDisplayName}
+                              </Typography.Text>
+                            )}
+                          </Space>
+                          <Space size={8} wrap className="text-muted">
+                            <span>
+                              <FileTextOutlined /> 反馈 {project._count?.feedbacks ?? 0}
+                            </span>
+                            <span>
+                              <TeamOutlined /> PR {project._count?.pullReqs ?? 0}
+                            </span>
+                            {project.attachmentCount ? (
+                              <span title="需求带图片或附件">📎 {project.attachmentCount}</span>
+                            ) : null}
+                          </Space>
                         </Space>
                       </Space>
-                    </Space>
+                    </div>
 
                     <Typography.Paragraph
                       type="secondary"
@@ -345,6 +386,22 @@ function ProjectsContent() {
                               <Tag color="magenta">+{requesters.length} 人也需要</Tag>
                             </Tooltip>
                           )}
+                          {!isCreator && user && (
+                            <Tooltip title={joined ? '已加入，点击退出' : '我也想用'}>
+                              <Button
+                                size="small"
+                                shape="circle"
+                                type={joined ? 'primary' : 'default'}
+                                icon={joined ? <CheckOutlined /> : <UserAddOutlined />}
+                                loading={joiningId === project.id}
+                                aria-label={joined ? '退出共同需求人' : '我也想用'}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void (joined ? quitAsRequester(project) : joinAsRequester(project));
+                                }}
+                              />
+                            </Tooltip>
+                          )}
                         </Space>
 
                         <Space size={6}>
@@ -361,41 +418,28 @@ function ProjectsContent() {
                           ) : (
                             <ProjectStatusTag status={project.status} />
                           )}
+                          {canClaim && (
+                            <Tooltip title="我来做">
+                              <Button
+                                size="small"
+                                shape="circle"
+                                type="primary"
+                                icon={<ToolOutlined />}
+                                aria-label="我来做"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setClaimTarget(project);
+                                  claimForm.resetFields();
+                                }}
+                              />
+                            </Tooltip>
+                          )}
                         </Space>
 
                         <span className="text-muted">创建于 {formatTime(project.createdAt)}</span>
                       </Space>
                     </div>
 
-                    <Space size={8} wrap style={{ marginTop: 'auto', paddingTop: 12 }}>
-                      {canClaim && (
-                        <Button
-                          size="small"
-                          type="primary"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setClaimTarget(project);
-                            claimForm.resetFields();
-                          }}
-                        >
-                          认领
-                        </Button>
-                      )}
-                      {!isCreator && user && (
-                        <Button
-                          size="small"
-                          type={joined ? 'default' : 'link'}
-                          loading={joiningId === project.id}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void (joined ? quitAsRequester(project) : joinAsRequester(project));
-                          }}
-                        >
-                          {joined ? '已加入，点击退出' : '＋ 我也需要'}
-                        </Button>
-                      )}
-                      <span className="text-muted project-card-hint">点击卡片查看详情</span>
-                    </Space>
                   </Card>
                 </Col>
               );
@@ -410,7 +454,7 @@ function ProjectsContent() {
           pageSize={pageSize}
           total={data?.total ?? 0}
           showSizeChanger
-          pageSizeOptions={[9, 12, 24, 48]}
+          pageSizeOptions={[12, 24, 48]}
           showTotal={(total) => `共 ${total} 条需求`}
           onChange={(nextPage, nextPageSize) => {
             setPage(nextPage);
@@ -428,9 +472,29 @@ function ProjectsContent() {
         okText="确认认领"
       >
         <Typography.Paragraph type="secondary">
-          认领后系统会自动在 Git 服务中创建项目仓库，并为你开通推送权限。
+          认领后系统会在 Git 服务中创建项目仓库，并为你开通推送权限。仓库英文名可留空，系统会自动生成。
         </Typography.Paragraph>
         <Form form={claimForm} layout="vertical">
+          <Form.Item
+            name="repoDisplayName"
+            label="仓库中文别名"
+            extra="例如“月度报表工具”，会显示在平台卡片和代码库描述中"
+          >
+            <Input placeholder={claimTarget?.title ?? '给这个成果起个容易认出的名字'} maxLength={120} />
+          </Form.Item>
+          <Form.Item
+            name="repoName"
+            label="仓库英文名（可选）"
+            extra="只使用字母、数字、连字符、下划线或点号，例如 monthly-report-tool"
+            rules={[
+              {
+                pattern: /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/,
+                message: '只能使用字母、数字、连字符、下划线或点号，且必须以字母或数字开头',
+              },
+            ]}
+          >
+            <Input placeholder="留空则自动生成" maxLength={100} />
+          </Form.Item>
           <Form.Item name="remark" label="认领留言">
             <Input.TextArea rows={3} maxLength={500} placeholder="可填写实现思路或预计完成时间" />
           </Form.Item>

@@ -28,6 +28,13 @@ export default () => ({
     expiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   },
 
+  /** 本地开发账号选择器配置：生产环境不会暴露账号与开发密码 */
+  devPicker: {
+    enabled: (process.env.DEV_USER_PICKER_ENABLED ?? 'false') === 'true',
+    adminPassword: process.env.DEV_PICKER_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? 'Admin@123456',
+    userPassword: process.env.DEV_PICKER_USER_PASSWORD ?? process.env.DEMO_PASSWORD ?? 'Demo@123456',
+  },
+
   /** Gitea 集成配置 */
   gitea: {
     /** 容器内网访问地址（服务端调用 API 使用） */
@@ -36,6 +43,8 @@ export default () => ({
     rootUrl: process.env.GITEA_ROOT_URL ?? 'http://git.localhost/',
     /** 存放所有项目仓库的组织名 */
     org: process.env.GITEA_ORG ?? 'projects',
+    /** 对外 SSH clone 端口 */
+    sshPort: Number(process.env.GITEA_SSH_PORT ?? 2222),
     /** 平台调用 Gitea API 的令牌 */
     apiToken: process.env.GITEA_API_TOKEN ?? '',
     /** Webhook 签名密钥 */
@@ -53,10 +62,10 @@ export default () => ({
   upload: {
     /** 落盘目录（容器内路径，由 docker volume 持久化） */
     dir: process.env.UPLOAD_DIR ?? '/app/uploads',
-    /** 单张图片大小上限（MB） */
-    imageMaxMb: Number(process.env.UPLOAD_IMAGE_MAX_MB ?? 10),
-    /** 单个附件大小上限（MB） */
-    fileMaxMb: Number(process.env.UPLOAD_FILE_MAX_MB ?? 30),
+    /** 单个上传文件大小上限（MB），内容类型不做白名单限制 */
+    maxMb: Number(process.env.UPLOAD_MAX_MB ?? 100),
+    /** 自定义头像大小上限（MB），头像接口只接受图片 */
+    avatarMaxMb: Number(process.env.AVATAR_MAX_MB ?? 5),
   },
 
   /** 邮件通知配置 */

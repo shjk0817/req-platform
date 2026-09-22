@@ -42,6 +42,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       name: user.name,
       role: user.role,
       giteaUsername: user.giteaUsername,
+      authMethod: 'jwt',
     };
   }
 }

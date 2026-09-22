@@ -2,12 +2,14 @@
 
 /**
  * 应用外壳组件
- * 作用：提供侧边导航、顶栏用户信息，并对未登录访问做统一拦截
+ * 作用：提供编辑型顶栏导航、用户操作区，并对未登录访问做统一拦截
  */
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { openGitea } from '@/lib/gitea';
 import AvatarBadge from '@/components/AvatarBadge';
+import GuidePopover from '@/components/GuidePopover';
+import { getPageGuide } from '@/lib/guides';
 import {
   AppstoreOutlined,
   BellOutlined,
@@ -15,14 +17,15 @@ import {
   DashboardOutlined,
   GithubOutlined,
   LogoutOutlined,
+  MenuOutlined,
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Badge, Button, Dropdown, Layout, Menu, Space, Spin, Tooltip, Typography } from 'antd';
+import { Badge, Button, Drawer, Dropdown, Layout, Menu, Space, Spin, Tooltip, Typography } from 'antd';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
 
-const { Header, Sider, Content } = Layout;
+const { Header, Content } = Layout;
 
 /** 无需登录即可访问的路径 */
 const PUBLIC_PATHS = ['/login', '/register'];
@@ -32,8 +35,28 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [unread, setUnread] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isPublicPage = PUBLIC_PATHS.some((path) => pathname?.startsWith(path));
+  const pageGuide = pathname ? getPageGuide(pathname) : null;
+  const pageTitle =
+    pathname === '/'
+      ? '工作台'
+      : pathname === '/projects'
+        ? '需求池'
+        : pathname === '/projects/new'
+          ? '写下一条需求'
+            : pathname?.includes('/deliverables')
+              ? '成果中心'
+          : pathname?.startsWith('/projects/')
+            ? '需求详情'
+            : pathname?.startsWith('/feedbacks')
+              ? '反馈中心'
+              : pathname?.startsWith('/notifications')
+                ? '消息通知'
+                : pathname?.startsWith('/admin')
+                  ? '用户审核'
+                  : '个人资料';
 
   // 未登录时跳转到登录页
   useEffect(() => {
@@ -80,12 +103,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  /** 侧边导航项（发布需求的入口统一放在需求池页，避免重复） */
+  /** 顶栏导航项（发布需求的入口统一放在需求池页，避免重复） */
   const menuItems = [
     { key: '/', icon: <DashboardOutlined />, label: '工作台' },
     { key: '/projects', icon: <AppstoreOutlined />, label: '需求池' },
     { key: '/feedbacks', icon: <BugOutlined />, label: '反馈中心' },
-    { key: '/notifications', icon: <BellOutlined />, label: '消息通知' },
+    {
+      key: '/notifications',
+      icon: <BellOutlined />,
+      label: <Badge count={unread} size="small" offset={[8, 0]}>消息通知</Badge>,
+    },
     { key: '/profile', icon: <UserOutlined />, label: '个人资料' },
     ...(isAdmin ? [{ key: '/admin/users', icon: <TeamOutlined />, label: '用户审核' }] : []),
   ];
@@ -98,67 +125,89 @@ export default function AppShell({ children }: { children: ReactNode }) {
       .sort((a, b) => b.length - a.length)[0] ?? '/';
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider breakpoint="lg" collapsedWidth="0" theme="light" width={216}>
-        <div style={{ padding: '18px 20px', fontSize: 16, fontWeight: 600, color: '#1677ff' }}>
-          需求协作平台
+    <Layout className="app-layout">
+      <Header className="app-header">
+        <div className="app-brand">
+          <span className="app-brand-mark">需</span>
+          <div>
+            <Typography.Text className="app-brand-name">需求协作平台</Typography.Text>
+            <Typography.Text className="app-brand-kicker">WORKFLOW ATELIER</Typography.Text>
+          </div>
         </div>
         <Menu
-          mode="inline"
+          className="top-nav-menu"
+          mode="horizontal"
           selectedKeys={[selectedKey]}
           items={menuItems}
           onClick={({ key }) => router.push(key)}
         />
-      </Sider>
-      <Layout>
-        <Header
-          style={{
-            background: '#fff',
-            padding: '0 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-          }}
-        >
-          <Space size={20}>
-            <Tooltip title="打开 Git 服务（平台会自动完成登录）">
-              <Button type="text" icon={<GithubOutlined />} onClick={() => void openGitea()}>
-                代码仓库
-              </Button>
-            </Tooltip>
-            <Badge count={unread} size="small">
-              <BellOutlined
-                style={{ fontSize: 18, cursor: 'pointer' }}
-                onClick={() => router.push('/notifications')}
-              />
-            </Badge>
-            <Dropdown
-              menu={{
-                items: [
-                  { key: 'profile', label: '个人资料', onClick: () => router.push('/profile') },
-                  {
-                    key: 'logout',
-                    icon: <LogoutOutlined />,
-                    label: '退出登录',
-                    onClick: () => {
-                      logout();
-                      router.replace('/login');
-                    },
+        <div className="header-actions">
+          <Tooltip title="只有需要修改代码的同事才需要打开这里，平台会自动完成登录">
+            <Button className="code-repository-button" type="text" icon={<GithubOutlined />} onClick={() => void openGitea()}>
+              给开发同事的代码库
+            </Button>
+          </Tooltip>
+          <Dropdown
+            menu={{
+              items: [
+                { key: 'profile', label: '个人资料', onClick: () => router.push('/profile') },
+                {
+                  key: 'logout',
+                  icon: <LogoutOutlined />,
+                  label: '退出登录',
+                  onClick: () => {
+                    logout();
+                    router.replace('/login');
                   },
-                ],
-              }}
-            >
-              <Space style={{ cursor: 'pointer' }}>
-                <AvatarBadge value={user.avatarUrl} name={user.name} size={28} />
-                <Typography.Text>{user.name}</Typography.Text>
-                {isAdmin && <Typography.Text type="secondary">（管理员）</Typography.Text>}
-              </Space>
-            </Dropdown>
-          </Space>
-        </Header>
-        <Content>{children}</Content>
-      </Layout>
+                },
+              ],
+            }}
+          >
+            <Space className="user-menu-trigger">
+              <AvatarBadge value={user.avatarUrl} name={user.name} size={30} />
+              <span className="user-menu-name">{user.name}</span>
+              {isAdmin && <span className="user-menu-role">管理员</span>}
+            </Space>
+          </Dropdown>
+          <Button
+            className="mobile-nav-trigger"
+            type="text"
+            icon={<MenuOutlined />}
+            aria-label="打开导航菜单"
+            onClick={() => setMobileMenuOpen(true)}
+          />
+        </div>
+      </Header>
+      <Drawer
+        title="平台导航"
+        placement="right"
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        className="mobile-nav-drawer"
+      >
+        <Menu
+          mode="vertical"
+          selectedKeys={[selectedKey]}
+          items={menuItems}
+          onClick={({ key }) => {
+            setMobileMenuOpen(false);
+            router.push(key);
+          }}
+        />
+      </Drawer>
+      <Content className="app-content">
+        <div className="page-heading">
+          <span className="page-heading-kicker">CURRENT VIEW</span>
+          <Typography.Title level={1}>{pageTitle}</Typography.Title>
+        </div>
+        {children}
+        {pageGuide && pathname && (
+          <GuidePopover
+            guide={pageGuide}
+            storageKey={`aimanager_guide_${pathname.replaceAll('/', '_') || 'home'}`}
+          />
+        )}
+      </Content>
     </Layout>
   );
 }

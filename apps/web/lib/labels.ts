@@ -6,11 +6,20 @@ import type { FeedbackStatus, FeedbackType, ProjectStatus, UserStatus } from './
 
 /** 项目状态 -> 中文与颜色 */
 export const PROJECT_STATUS_MAP: Record<ProjectStatus, { text: string; color: string }> = {
-  OPEN: { text: '待认领', color: 'orange' },
-  CLAIMED: { text: '已认领', color: 'blue' },
-  DEVELOPING: { text: '开发中', color: 'geekblue' },
-  RELEASED: { text: '已发布', color: 'green' },
-  CLOSED: { text: '已关闭', color: 'default' },
+  OPEN: { text: '等同事接手', color: 'orange' },
+  CLAIMED: { text: '已有人接手', color: 'blue' },
+  DEVELOPING: { text: '正在做', color: 'geekblue' },
+  RELEASED: { text: '请你试用', color: 'green' },
+  CLOSED: { text: '已结束', color: 'default' },
+};
+
+/** 项目阶段的人话说明，放在状态标签旁帮助非技术用户理解下一步 */
+export const PROJECT_STAGE_HELP: Record<ProjectStatus, string> = {
+  OPEN: '还没有同事接手，你可以补充说明或邀请熟悉的人看看。',
+  CLAIMED: '同事已经接手，还没开始修改；你现在只需要等待。',
+  DEVELOPING: '同事正在修改，遇到问题可以在反馈里说明。',
+  RELEASED: '负责人已经完成一版，请按验收清单试用。',
+  CLOSED: '这条需求已经结束，不会再继续推进。',
 };
 
 /** 反馈类型 -> 中文与颜色 */
@@ -22,11 +31,11 @@ export const FEEDBACK_TYPE_MAP: Record<FeedbackType, { text: string; color: stri
 
 /** 项目进度条颜色：与状态语义保持一致 */
 export const PROJECT_PROGRESS_COLOR: Record<ProjectStatus, string> = {
-  OPEN: '#fa8c16',
-  CLAIMED: '#1677ff',
-  DEVELOPING: '#2f54eb',
-  RELEASED: '#52c41a',
-  CLOSED: '#bfbfbf',
+  OPEN: '#c08532',
+  CLAIMED: '#84847e',
+  DEVELOPING: '#c08532',
+  RELEASED: '#34785c',
+  CLOSED: '#a1a19f',
 };
 
 /** 反馈状态 -> 中文与颜色 */

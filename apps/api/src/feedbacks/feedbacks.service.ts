@@ -228,7 +228,7 @@ export class FeedbacksService {
       targets.add(project.ownerId);
     }
     await this.notifications.createMany([...targets], {
-      type: NotificationType.FEEDBACK_CREATED,
+      type: NotificationType.FEEDBACK_UPDATED,
       title: `反馈「${feedback.title}」有新回复`,
       content: `${user.name}：${dto.content.slice(0, 120)}`,
       link: `/projects/${feedback.projectId}?tab=feedback&feedbackId=${id}`,
@@ -278,7 +278,7 @@ export class FeedbacksService {
     if (feedback.userId !== actor.id) {
       await this.notifications.create({
         userId: feedback.userId,
-        type: NotificationType.FEEDBACK_CREATED,
+        type: NotificationType.FEEDBACK_UPDATED,
         title: `反馈「${feedback.title}」状态已更新`,
         content: `状态已变更为 ${dto.status}。${dto.remark ?? ''}`,
         link: `/projects/${feedback.projectId}?tab=feedback&feedbackId=${id}`,

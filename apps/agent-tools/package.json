@@ -1,0 +1,30 @@
+{
+  "name": "@aimanager/agent-tools",
+  "version": "0.1.0",
+  "description": "aiManager CLI、远程 MCP 与本地 MCP companion",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "aim": "./dist/cli.js",
+    "aim-mcp": "./dist/mcp-stdio.js",
+    "aim-mcp-server": "./dist/mcp-http.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start:cli": "node dist/cli.js",
+    "start:mcp": "node dist/mcp-stdio.js",
+    "start:mcp:http": "node dist/mcp-http.js",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "commander": "^13.1.0",
+    "keytar": "^7.9.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "typescript": "^5.7.2"
+  }
+}

@@ -22,6 +22,11 @@
 		reverse_proxy api:4000
 	}
 
+	# 标准 Streamable HTTP MCP：鉴权由 MCP 服务转发到平台 Agent API
+	handle /mcp* {
+		reverse_proxy agent-mcp:4100
+	}
+
 	# 其余请求交给 Next.js
 	handle {
 		reverse_proxy web:3000

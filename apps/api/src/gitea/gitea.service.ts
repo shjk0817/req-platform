@@ -85,6 +85,8 @@ export class GiteaService {
     });
 
     let response: Response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
     try {
       response = await fetch(url, {
         method: options.method ?? 'GET',
@@ -94,11 +96,17 @@ export class GiteaService {
           Accept: 'application/json',
         },
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: controller.signal,
       });
     } catch (error) {
+      clearTimeout(timeout);
       this.logger.error(`调用 Gitea 失败: ${options.method ?? 'GET'} ${path} - ${(error as Error).message}`);
+      if ((error as Error).name === 'TimeoutError' || (error as Error).name === 'AbortError') {
+        throw new ServiceUnavailableException('Gitea 响应超时，请检查服务状态');
+      }
       throw new ServiceUnavailableException('无法连接 Gitea 服务，请检查服务状态');
     }
+    clearTimeout(timeout);
 
     if (response.status === 404 && options.ignoreNotFound) {
       return null;
@@ -541,6 +549,100 @@ export class GiteaService {
   // ----------------------------------------------------------------
   // 查询
   // ----------------------------------------------------------------
+
+  /**
+   * 读取仓库中的单个文本文件
+   * 作用：成果页只读取 README 与教程，不把 Gitea 仓库内容复制到平台数据库
+   * @param owner 仓库所属组织
+   * @param repo 仓库名
+   * @param path 文件路径
+   * @param ref 分支或标签
+   */
+  async getRepositoryFile(
+    owner: string,
+    repo: string,
+    path: string,
+    ref = 'main',
+  ): Promise<{ path: string; content: string; htmlUrl?: string } | null> {
+    const file = await this.request<{
+      type?: string;
+      path?: string;
+      content?: string;
+      html_url?: string;
+    }>(`/api/v1/repos/${owner}/${repo}/contents/${path}`, {
+      query: { ref },
+      ignoreNotFound: true,
+    });
+    if (!file?.content || file.type === 'dir') {
+      return null;
+    }
+    return {
+      path: file.path ?? path,
+      content: Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8'),
+      htmlUrl: file.html_url,
+    };
+  }
+
+  /**
+   * 读取仓库 README
+   * @param owner 仓库所属组织
+   * @param repo 仓库名
+   */
+  async getRepositoryReadme(owner: string, repo: string) {
+    return this.getRepositoryFile(owner, repo, 'README.md');
+  }
+
+  /**
+   * 按约定路径查找使用教程
+   * 作用：兼容新模板与旧仓库，避免要求开发同事立刻迁移文件名
+   * @param owner 仓库所属组织
+   * @param repo 仓库名
+   */
+  async getRepositoryTutorial(owner: string, repo: string) {
+    for (const path of ['docs/USAGE.md', 'docs/README.md', 'USAGE.md']) {
+      const file = await this.getRepositoryFile(owner, repo, path);
+      if (file) {
+        return file;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 查询 Release 及其下载附件
+   * @param owner 仓库所属组织
+   * @param repo 仓库名
+   */
+  async listReleaseDownloads(owner: string, repo: string) {
+    const releases =
+      (await this.request<
+        Array<{
+          id: number;
+          tag_name: string;
+          name?: string;
+          html_url: string;
+          published_at?: string | null;
+          assets?: Array<{ id: number; name: string; size: number; browser_download_url: string }>;
+        }>
+      >(`/api/v1/repos/${owner}/${repo}/releases`, {
+        query: { limit: 20 },
+        ignoreNotFound: true,
+      })) ?? [];
+
+    return releases.map((release) => ({
+      id: release.id,
+      tag: release.tag_name,
+      name: release.name || release.tag_name,
+      htmlUrl: release.html_url,
+      publishedAt: release.published_at ?? null,
+      assets: (release.assets ?? []).map((asset) => ({
+        id: asset.id,
+        name: asset.name,
+        size: asset.size,
+        downloadUrl: asset.browser_download_url,
+      })),
+    }));
+  }
 
   /**
    * 查询仓库的 Pull Request 列表（Webhook 之外的兜底同步用）

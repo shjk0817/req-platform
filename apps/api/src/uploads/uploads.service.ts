@@ -13,11 +13,11 @@ import { Injectable, Logger, NotFoundException, PayloadTooLargeException, BadReq
 import { ConfigService } from '@nestjs/config';
 import { Attachment, AttachmentKind } from '@prisma/client';
 import { createReadStream } from 'node:fs';
-import { mkdir, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, extname } from 'node:path';
 import type { Response } from 'express';
 
-/** 上传文件的最小结构（来自 multer 内存存储） */
+/** 上传文件的最小结构（来自 multer 临时落盘存储，测试也可传入 buffer） */
 export interface UploadedFileLike {
   /** 表单字段名 */
   fieldname: string;
@@ -27,38 +27,11 @@ export interface UploadedFileLike {
   mimetype: string;
   /** 文件大小（字节） */
   size: number;
-  /** 文件内容 */
-  buffer: Buffer;
+  /** 文件临时路径 */
+  path?: string;
+  /** 文件内容（兼容单测与其他调用方） */
+  buffer?: Buffer;
 }
-
-/** 允许内联预览的图片类型 */
-const IMAGE_MIME_WHITELIST = [
-  'image/png',
-  'image/jpeg',
-  'image/jpg',
-  'image/gif',
-  'image/webp',
-  'image/bmp',
-];
-
-/** 禁止上传的可执行类扩展名 */
-const BLOCKED_EXTENSIONS = [
-  '.exe',
-  '.dll',
-  '.so',
-  '.dylib',
-  '.bat',
-  '.cmd',
-  '.com',
-  '.scr',
-  '.msi',
-  '.ps1',
-  '.sh',
-  '.jar',
-  '.app',
-  '.dmg',
-  '.vbs',
-];
 
 @Injectable()
 export class UploadsService {
@@ -74,14 +47,26 @@ export class UploadsService {
     return this.config.get<string>('upload.dir') ?? '/app/uploads';
   }
 
-  /** 单个图片的大小上限（MB） */
-  private get imageMaxMb(): number {
-    return this.config.get<number>('upload.imageMaxMb') ?? 10;
+  /** 所有文件的大小上限（MB），不按扩展名限制内容格式 */
+  private get maxMb(): number {
+    return this.config.get<number>('upload.maxMb') ?? 100;
   }
 
-  /** 单个附件的大小上限（MB） */
-  private get fileMaxMb(): number {
-    return this.config.get<number>('upload.fileMaxMb') ?? 30;
+  /** 保存自定义头像：只接受图片，并使用更严格的头像大小上限 */
+  async saveAvatar(uploaderId: string, file?: UploadedFileLike): Promise<AttachmentDto> {
+    const avatarMaxMb = this.config.get<number>('upload.avatarMaxMb') ?? 5;
+    if (!file || (!file.path && (!file.buffer || file.buffer.length === 0))) {
+      throw new BadRequestException('未接收到头像图片');
+    }
+    if (!file.mimetype.toLowerCase().startsWith('image/')) {
+      await this.removeTemporaryFile(file);
+      throw new BadRequestException('头像必须是图片格式');
+    }
+    if (file.size > avatarMaxMb * 1024 * 1024) {
+      await this.removeTemporaryFile(file);
+      throw new PayloadTooLargeException(`头像大小不能超过 ${avatarMaxMb}MB`);
+    }
+    return this.save(uploaderId, file);
   }
 
   /**
@@ -90,48 +75,60 @@ export class UploadsService {
    * @param file 上传的文件
    */
   async save(uploaderId: string, file?: UploadedFileLike): Promise<AttachmentDto> {
-    if (!file || !file.buffer || file.buffer.length === 0) {
+    if (!file || (!file.path && (!file.buffer || file.buffer.length === 0))) {
       throw new BadRequestException('未接收到文件内容');
     }
 
-    const isImage = IMAGE_MIME_WHITELIST.includes(file.mimetype.toLowerCase());
+    const isImage = file.mimetype.toLowerCase().startsWith('image/');
     const kind: AttachmentKind = isImage ? AttachmentKind.IMAGE : AttachmentKind.FILE;
 
-    // 大小校验：图片与普通附件使用不同上限
-    const maxMb = isImage ? this.imageMaxMb : this.fileMaxMb;
-    if (file.size > maxMb * 1024 * 1024) {
-      throw new PayloadTooLargeException(`${isImage ? '图片' : '附件'}大小不能超过 ${maxMb}MB`);
-    }
-
-    const extension = extname(file.originalname).toLowerCase();
-    if (!isImage && BLOCKED_EXTENSIONS.includes(extension)) {
-      throw new BadRequestException(`出于安全考虑，不允许上传 ${extension} 类型的文件`);
+    if (file.size > this.maxMb * 1024 * 1024) {
+      await this.removeTemporaryFile(file);
+      throw new PayloadTooLargeException(`文件大小不能超过 ${this.maxMb}MB`);
     }
 
     // 目录按年月分片，避免单目录文件过多
     const now = new Date();
     const relativeDir = join(String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0'));
+    const extension = extname(file.originalname).toLowerCase();
     const safeExtension = isImage ? extension || `.${file.mimetype.split('/')[1]}` : extension;
     const fileName = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}${safeExtension}`;
     const storagePath = join(relativeDir, fileName);
 
     const absoluteDir = join(this.uploadDir, relativeDir);
     await mkdir(absoluteDir, { recursive: true });
-    await writeFile(join(this.uploadDir, storagePath), file.buffer);
+    const absolutePath = join(this.uploadDir, storagePath);
+    if (file.path) {
+      await rename(file.path, absolutePath);
+    } else if (file.buffer) {
+      await writeFile(absolutePath, file.buffer);
+    }
 
-    const attachment = await this.prisma.attachment.create({
-      data: {
-        uploaderId,
-        kind,
-        name: this.normalizeName(file.originalname),
-        mime: file.mimetype,
-        size: file.size,
-        storagePath,
-      },
-    });
+    try {
+      const attachment = await this.prisma.attachment.create({
+        data: {
+          uploaderId,
+          kind,
+          name: this.normalizeName(file.originalname),
+          mime: file.mimetype,
+          size: file.size,
+          storagePath,
+        },
+      });
 
-    this.logger.log(`附件已上传: ${attachment.id} (${attachment.kind}, ${attachment.size} 字节)`);
-    return this.toDto(attachment);
+      this.logger.log(`附件已上传: ${attachment.id} (${attachment.kind}, ${attachment.size} 字节)`);
+      return this.toDto(attachment);
+    } catch (error) {
+      await unlink(absolutePath).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  /** 清理超限或校验失败时留下的临时文件 */
+  private async removeTemporaryFile(file: UploadedFileLike): Promise<void> {
+    if (file.path) {
+      await unlink(file.path).catch(() => undefined);
+    }
   }
 
   /**
@@ -182,8 +179,9 @@ export class UploadsService {
 
     res.setHeader('Content-Type', attachment.mime || 'application/octet-stream');
     res.setHeader('Content-Length', String(attachment.size));
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'private, max-age=86400');
-    if (download) {
+    if (download || attachment.kind !== AttachmentKind.IMAGE) {
       // 文件名可能是中文，使用 RFC 5987 编码，避免浏览器乱码
       res.setHeader(
         'Content-Disposition',
@@ -213,7 +211,7 @@ export class UploadsService {
   async cleanupOrphans(olderThanHours = 24): Promise<number> {
     const deadline = new Date(Date.now() - olderThanHours * 60 * 60 * 1000);
     const orphans = await this.prisma.attachment.findMany({
-      where: { projectId: null, createdAt: { lt: deadline } },
+      where: { projectId: null, avatarUser: null, createdAt: { lt: deadline } },
       select: { id: true, storagePath: true },
     });
     for (const orphan of orphans) {

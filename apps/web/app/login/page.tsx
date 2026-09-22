@@ -9,10 +9,11 @@
  *   3. 回跳地址是站外地址（典型场景：从 Git 服务被弹回来）时，
  *      先签发 Git 免密 Cookie 再跳转，保证回去后是已登录状态。
  */
-import { useAuth } from '@/lib/auth';
+import { DEV_USER_PICKER_ENABLED, type DevPickerUser, useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { isExternalUrl, redirectToExternal } from '@/lib/gitea';
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Form, Input, Typography, message } from 'antd';
+import { Alert, Button, Card, Form, Input, Select, Typography, message } from 'antd';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
@@ -22,8 +23,27 @@ function LoginForm() {
   const { user, ready, login } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
+  const [form] = Form.useForm<{ email: string; password: string }>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [devUsers, setDevUsers] = useState<DevPickerUser[]>([]);
+  const [devUsersLoading, setDevUsersLoading] = useState(false);
+  const [selectedDevUserId, setSelectedDevUserId] = useState<string>();
+
+  /** 开发环境加载可选账号，生产构建不会显示该入口 */
+  useEffect(() => {
+    if (!DEV_USER_PICKER_ENABLED) {
+      return;
+    }
+    setDevUsersLoading(true);
+    void api
+      .get<DevPickerUser[]>('/auth/dev-users')
+      .then(setDevUsers)
+      .catch(() => {
+        setError('开发账号列表加载失败，请检查后端是否处于开发模式');
+      })
+      .finally(() => setDevUsersLoading(false));
+  }, []);
 
   /** 回跳地址：为空、指回登录页或工作台时统一落到工作台 */
   const resolveRedirect = useCallback((): string => {
@@ -73,17 +93,20 @@ function LoginForm() {
     }
   };
 
+  /** 选择开发账号后填充邮箱和密码，最终仍提交普通登录表单 */
+  const onSelectDevUser = (userId: string) => {
+    const selected = devUsers.find((item) => item.id === userId);
+    if (!selected) {
+      return;
+    }
+    setSelectedDevUserId(userId);
+    form.setFieldsValue({ email: selected.email, password: selected.password });
+    setError(null);
+  };
+
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #e6f4ff 0%, #f5f6fa 100%)',
-      }}
-    >
-      <Card style={{ width: 400 }} variant="borderless">
+    <div className="auth-page">
+      <Card className="auth-card" style={{ width: 400 }} variant="borderless">
         <Typography.Title level={3} style={{ textAlign: 'center', marginBottom: 4 }}>
           内部需求协作平台
         </Typography.Title>
@@ -93,7 +116,7 @@ function LoginForm() {
 
         {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
 
-        <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
+        <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item
             name="email"
             label="邮箱"
@@ -102,7 +125,28 @@ function LoginForm() {
               { type: 'email', message: '邮箱格式不正确' },
             ]}
           >
-            <Input prefix={<MailOutlined />} placeholder="name@example.com" size="large" />
+            <Input
+              prefix={<MailOutlined />}
+              placeholder="name@example.com"
+              size="large"
+              addonAfter={
+                DEV_USER_PICKER_ENABLED ? (
+                  <Select
+                    aria-label="选择开发账号"
+                    allowClear
+                    loading={devUsersLoading}
+                    placeholder="选择开发账号"
+                    value={selectedDevUserId}
+                    onChange={onSelectDevUser}
+                    options={devUsers.map((item) => ({
+                      value: item.id,
+                      label: `${item.name}（${item.role === 'ADMIN' ? '管理员' : '普通用户'}）`,
+                    }))}
+                    style={{ width: 168 }}
+                  />
+                ) : undefined
+              }
+            />
           </Form.Item>
           <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
             <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" size="large" />
@@ -117,6 +161,11 @@ function LoginForm() {
         <Typography.Paragraph style={{ textAlign: 'center', marginBottom: 0 }}>
           还没有账号？<Link href="/register">立即注册</Link>
         </Typography.Paragraph>
+        {DEV_USER_PICKER_ENABLED && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, textAlign: 'center' }}>
+            选择开发账号后会自动填充账号和密码，再点击「登录」
+          </Typography.Paragraph>
+        )}
       </Card>
     </div>
   );

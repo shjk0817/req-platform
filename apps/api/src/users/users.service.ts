@@ -8,6 +8,7 @@ import { GiteaService } from '../gitea/gitea.service';
 import { MailService } from '../notifications/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { UploadedFileLike, UploadsService } from '../uploads/uploads.service';
 import { generatePassword } from '../common/utils/naming.util';
 import { buildPaginated, PaginationQueryDto } from '../common/dto/pagination.dto';
 import { isAllowedAvatar, USER_AVATAR_PRESETS } from '../common/constants/avatars';
@@ -25,6 +26,7 @@ export class UsersService {
     private readonly notifications: NotificationsService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly uploads: UploadsService,
   ) {}
 
   /**
@@ -69,13 +71,14 @@ export class UsersService {
     if (query.keyword) {
       where.OR = [
         { name: { contains: query.keyword, mode: 'insensitive' } },
-        { skills: { has: query.keyword } },
+        { department: { contains: query.keyword, mode: 'insensitive' } },
+        { email: { contains: query.keyword, mode: 'insensitive' } },
       ];
     }
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        select: { id: true, name: true, department: true, skills: true, avatarUrl: true, giteaUsername: true },
+        select: { id: true, name: true, department: true, avatarUrl: true, giteaUsername: true },
         orderBy: { name: 'asc' },
         skip: query.skip,
         take: query.pageSize,
@@ -114,6 +117,24 @@ export class UsersService {
         department: dto.department,
         skills: dto.skills,
         avatarUrl: dto.avatarUrl,
+        avatarAttachmentId: dto.avatarUrl === undefined ? undefined : null,
+      },
+      select: this.publicSelect,
+    });
+  }
+
+  /**
+   * 上传并设置自定义头像
+   * @param userId 当前用户主键
+   * @param file 上传的图片
+   */
+  async updateAvatarFromUpload(userId: string, file?: UploadedFileLike) {
+    const attachment = await this.uploads.saveAvatar(userId, file);
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        avatarUrl: attachment.url,
+        avatarAttachmentId: attachment.id,
       },
       select: this.publicSelect,
     });

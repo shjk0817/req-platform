@@ -7,10 +7,16 @@ WORKDIR /app
 
 # 前端构建时需要注入后端地址（浏览器通过同域 /api 访问）
 ARG NEXT_PUBLIC_API_URL=/api
+ARG NEXT_PUBLIC_DEV_USER_PICKER=false
+ARG NEXT_PUBLIC_UPLOAD_MAX_MB=100
+ARG NEXT_PUBLIC_AVATAR_MAX_MB=5
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_DEV_USER_PICKER=${NEXT_PUBLIC_DEV_USER_PICKER}
+ENV NEXT_PUBLIC_UPLOAD_MAX_MB=${NEXT_PUBLIC_UPLOAD_MAX_MB}
+ENV NEXT_PUBLIC_AVATAR_MAX_MB=${NEXT_PUBLIC_AVATAR_MAX_MB}
 
-COPY package.json ./
-RUN npm install --no-audit --no-fund
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 COPY tsconfig.json next.config.mjs ./
 COPY app ./app

@@ -20,4 +20,10 @@ export interface AuthUser {
   name: string;
   role: Role;
   giteaUsername: string | null;
+  /** 登录来源：普通 JWT 或个人访问令牌 */
+  authMethod?: 'jwt' | 'pat';
+  /** 个人访问令牌主键 */
+  tokenId?: string;
+  /** 个人访问令牌权限范围 */
+  scopes?: string[];
 }

@@ -8,7 +8,13 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { NotificationType, Role, UserStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConflictException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
@@ -84,7 +90,15 @@ export class AuthService {
     }
 
     const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) {
+    const devPickerEnabled = this.config.get<boolean>('devPicker.enabled') ?? false;
+    const env = this.config.get<string>('env') ?? 'development';
+    const devPickerPassword =
+      user.role === Role.ADMIN
+        ? this.config.get<string>('devPicker.adminPassword')
+        : this.config.get<string>('devPicker.userPassword');
+    const validDevPickerPassword =
+      env !== 'production' && devPickerEnabled && dto.password === devPickerPassword;
+    if (!valid && !validDevPickerPassword) {
       throw new UnauthorizedException('邮箱或密码错误');
     }
 
@@ -95,13 +109,34 @@ export class AuthService {
       throw new ForbiddenException('账号已被停用，请联系管理员');
     }
 
-    const expiresIn = this.config.get<string>('jwt.expiresIn') as string;
-    const token = await this.jwt.signAsync(
-      { sub: user.id, email: user.email, role: user.role },
-      { secret: this.config.get<string>('jwt.secret'), expiresIn },
-    );
+    return this.createSession(user);
+  }
 
-    return { token, user: this.toProfile(user) };
+  /**
+   * 获取开发环境账号选择器数据
+   * 作用：只返回 ACTIVE 账号和开发环境约定密码，前端随后仍调用普通密码登录接口。
+   */
+  async getDevUsers() {
+    const env = this.config.get<string>('env') ?? 'development';
+    const enabled = this.config.get<boolean>('devPicker.enabled') ?? false;
+    if (env === 'production' || !enabled) {
+      throw new ForbiddenException('开发账号选择器未开启或当前环境不允许');
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: { status: UserStatus.ACTIVE },
+      select: { id: true, email: true, name: true, role: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const adminPassword = this.config.get<string>('devPicker.adminPassword') ?? 'Admin@123456';
+    const userPassword = this.config.get<string>('devPicker.userPassword') ?? 'Demo@123456';
+
+    return users
+      .sort((left, right) => (left.role === right.role ? 0 : left.role === Role.ADMIN ? -1 : 1))
+      .map((user) => ({
+        ...user,
+        password: user.role === Role.ADMIN ? adminPassword : userPassword,
+      }));
   }
 
   /**
@@ -134,6 +169,29 @@ export class AuthService {
       department: user.department,
       createdAt: user.createdAt,
     };
+  }
+
+  /**
+   * 统一签发平台 JWT，保证普通登录与开发登录的会话结构完全一致
+   * @param user 已通过状态校验的用户
+   */
+  private async createSession(user: {
+    id: string;
+    email: string;
+    role: Role;
+    status: UserStatus;
+    name: string;
+    department: string | null;
+    skills: string[];
+    avatarUrl: string | null;
+    giteaUsername: string | null;
+  }) {
+    const expiresIn = this.config.get<string>('jwt.expiresIn') as string;
+    const token = await this.jwt.signAsync(
+      { sub: user.id, email: user.email, role: user.role },
+      { secret: this.config.get<string>('jwt.secret'), expiresIn },
+    );
+    return { token, user: this.toProfile(user) };
   }
 
   /** 过滤敏感字段后的用户信息 */

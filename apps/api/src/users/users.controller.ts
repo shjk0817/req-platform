@@ -7,9 +7,17 @@ import { UsersService } from './users.service';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { mkdirSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import type { UploadedFileLike } from '../uploads/uploads.service';
+
+/** 自定义头像临时落盘目录 */
+const AVATAR_TEMP_DIR = process.env.UPLOAD_TEMP_DIR ?? '/tmp/aimanager-uploads';
 
 @ApiTags('用户')
 @ApiBearerAuth()
@@ -44,6 +52,30 @@ export class UsersController {
   @ApiOperation({ summary: '修改个人资料与能力标签' })
   updateProfile(@CurrentUser('id') userId: string, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(userId, dto);
+  }
+
+  /** 上传并设置当前用户的自定义头像 */
+  @Post('profile/avatar')
+  @ApiOperation({ summary: '上传并设置自定义头像' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (_request, _file, callback) => {
+          mkdirSync(AVATAR_TEMP_DIR, { recursive: true });
+          callback(null, AVATAR_TEMP_DIR);
+        },
+        filename: (_request, _file, callback) => {
+          callback(null, `${randomUUID()}.avatar`);
+        },
+      }),
+      limits: { fileSize: Number(process.env.AVATAR_MAX_MB ?? 5) * 1024 * 1024 },
+    }),
+  )
+  uploadAvatar(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: UploadedFileLike,
+  ) {
+    return this.usersService.updateAvatarFromUpload(userId, file);
   }
 
   /** 管理员审核注册申请 */

@@ -150,3 +150,34 @@ export async function uploadFile<T = Attachment>(file: File): Promise<T> {
   }
   return data as T;
 }
+
+/** 上传自定义头像并返回更新后的用户资料 */
+export async function uploadAvatar<T = { avatarUrl?: string | null }>(file: File): Promise<T> {
+  const url = `${API_BASE}/users/profile/avatar`;
+  const form = new FormData();
+  form.append('file', file);
+
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, { method: 'POST', headers, body: form });
+  } catch {
+    throw new ApiError('头像上传失败，请检查网络后重试', 0);
+  }
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    const message =
+      (data && typeof data === 'object' && 'message' in data
+        ? String((data as { message: unknown }).message)
+        : '') || `头像上传失败（${response.status}）`;
+    throw new ApiError(message, response.status);
+  }
+  return data as T;
+}

@@ -192,20 +192,6 @@ export default function AdminUsersPage() {
             ),
           },
           {
-            title: '能力标签',
-            width: 220,
-            render: (_, record) =>
-              record.skills?.length ? (
-                <Space size={4} wrap>
-                  {record.skills.slice(0, 4).map((skill) => (
-                    <Tag key={skill}>{skill}</Tag>
-                  ))}
-                </Space>
-              ) : (
-                <span className="text-muted">-</span>
-              ),
-          },
-          {
             title: 'Git 账号',
             width: 160,
             render: (_, record) => record.giteaUsername || <span className="text-muted">未开通</span>,

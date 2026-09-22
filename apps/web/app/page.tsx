@@ -129,6 +129,27 @@ export default function DashboardPage() {
         />
       )}
 
+      {todos?.nextAction && (
+        <Card
+          className="next-action-card"
+          style={{ marginBottom: 16 }}
+          title="现在该做什么"
+          extra={<Tag color="blue">只做这一件</Tag>}
+        >
+          <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
+            <div>
+              <Typography.Title level={5} style={{ margin: 0 }}>
+                {todos.nextAction.title}
+              </Typography.Title>
+              <Typography.Text type="secondary">{todos.nextAction.reason}</Typography.Text>
+            </div>
+            <Link href={todos.nextAction.href}>
+              <Button type="primary">{todos.nextAction.primaryLabel}</Button>
+            </Link>
+          </Space>
+        </Card>
+      )}
+
       <Spin spinning={loading}>
         <Row gutter={[16, 16]}>
           <Col xs={12} md={6}>
@@ -143,7 +164,7 @@ export default function DashboardPage() {
             <Link href="/projects?scope=unclaimed" className="stat-card-link">
               <Card hoverable>
                 <Statistic
-                  title="待认领"
+                  title="等同事接手"
                   value={stats?.open ?? 0}
                   valueStyle={{ color: '#fa8c16' }}
                   prefix={<RocketOutlined />}
@@ -156,9 +177,9 @@ export default function DashboardPage() {
             <Link href="/projects?scope=developing" className="stat-card-link">
               <Card hoverable>
                 <Statistic
-                  title="开发中"
+                  title="正在做"
                   value={(stats?.claimed ?? 0) + (stats?.developing ?? 0)}
-                  valueStyle={{ color: '#1677ff' }}
+                  valueStyle={{ color: '#34785c' }}
                   prefix={<ToolOutlined />}
                 />
                 <span className="stat-card-hint">查看开发进度</span>
@@ -183,7 +204,7 @@ export default function DashboardPage() {
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
           <Col xs={24} lg={8}>
             <Card
-              title="我负责的项目"
+              title="我在做的项目"
               extra={
                 <Link href="/projects?scope=mine">
                   <Typography.Link>查看全部</Typography.Link>
@@ -250,18 +271,22 @@ export default function DashboardPage() {
           <Col xs={24} lg={8}>
             <Card title="我的待办" style={{ minHeight: 320 }}>
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                <Card size="small" type="inner" title="待处理反馈">
-                  <Space>
-                    <BugOutlined />
-                    <Typography.Text>{todos?.pendingFeedbacks ?? 0} 条我提交的反馈仍在处理中</Typography.Text>
-                  </Space>
-                </Card>
-                <Card size="small" type="inner" title="进行中的 PR">
-                  <Space>
-                    <CheckCircleOutlined />
-                    <Typography.Text>{todos?.openPullRequests ?? 0} 个我提交的 PR 尚未合并</Typography.Text>
-                  </Space>
-                </Card>
+                <Link href="/feedbacks?scope=assigned&status=OPEN">
+                  <Card size="small" type="inner" title="待处理反馈" hoverable>
+                    <Space>
+                      <BugOutlined />
+                      <Typography.Text>{todos?.pendingFeedbacks ?? 0} 条反馈等你跟进</Typography.Text>
+                    </Space>
+                  </Card>
+                </Link>
+                <Link href="/projects?scope=mine">
+                  <Card size="small" type="inner" title="正在做的修改" hoverable>
+                    <Space>
+                      <CheckCircleOutlined />
+                      <Typography.Text>{todos?.openPullRequests ?? 0} 份修改还在等待确认</Typography.Text>
+                    </Space>
+                  </Card>
+                </Link>
                 <Card size="small" type="inner" title="团队协作">
                   <Space>
                     <TeamOutlined />

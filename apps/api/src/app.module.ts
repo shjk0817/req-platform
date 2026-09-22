@@ -18,6 +18,9 @@ import { StatsModule } from './stats/stats.module';
 import { TasksModule } from './tasks/tasks.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
+import { IntegrationModule } from './integrations/integration.module';
+import { AgentModule } from './agent/agent.module';
+import { ScopesGuard } from './common/guards/scopes.guard';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
@@ -38,6 +41,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     FeedbacksModule,
     StatsModule,
     UploadsModule,
+    IntegrationModule,
+    AgentModule,
     TasksModule,
   ],
   controllers: [HealthController],
@@ -48,6 +53,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     // 全局角色校验：配合 @Roles 使用
     { provide: APP_GUARD, useClass: RolesGuard },
+    // 机器客户端接口通过 @Scopes 声明最小权限范围
+    { provide: APP_GUARD, useClass: ScopesGuard },
   ],
 })
 export class AppModule {}

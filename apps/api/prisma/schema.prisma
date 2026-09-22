@@ -35,6 +35,13 @@ enum ProjectStatus {
   CLOSED // 已关闭（不再维护）
 }
 
+/// 验收条目结果
+enum AcceptanceItemResult {
+  PENDING // 尚未试用
+  PASSED // 需求方确认通过
+  FAILED // 需求方指出问题
+}
+
 /// 项目成员角色
 enum MemberRole {
   OWNER // 项目负责人（认领人）
@@ -60,11 +67,23 @@ enum FeedbackStatus {
 enum NotificationType {
   USER_APPROVED // 账号审核通过
   PROJECT_CLAIMED // 项目被认领
+  PROJECT_MATCHED // 有匹配能力的新需求
+  PROJECT_STATUS_CHANGED // 项目阶段变化
+  PROJECT_OVERDUE // 项目或反馈超期
+  PROJECT_NUDGED // 有人催办项目
   PROJECT_MEMBER_ADDED // 被加入项目
   PROJECT_REQUESTER_ADDED // 有同事加入共同需求人
   FEEDBACK_CREATED // 项目收到新反馈
+  FEEDBACK_UPDATED // 反馈有回复或状态变化
   PR_UPDATED // PR 状态变更
   CI_FINISHED // CI 流水线结束
+  PROJECT_UPDATE_CREATED // 项目沟通或追加需求
+}
+
+/// 项目更新类型
+enum ProjectUpdateKind {
+  COMMUNICATION // 普通沟通记录
+  ADDITIONAL_REQUIREMENT // 追加需求
 }
 
 /// 附件类型
@@ -75,38 +94,84 @@ enum AttachmentKind {
 
 /// 用户
 model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
-  name          String
-  password      String
-  role          Role       @default(EMPLOYEE)
-  status        UserStatus @default(PENDING)
+  id                 String     @id @default(cuid())
+  email              String     @unique
+  name               String
+  password           String
+  role               Role       @default(EMPLOYEE)
+  status             UserStatus @default(PENDING)
   /// 能力标签，用于需求方筛选合适的开发者
-  skills        String[]   @default([])
-  department    String?
+  skills             String[]   @default([])
+  department         String?
   /// 头像：优先存预设标识（如 user-01），也兼容图片地址
-  avatarUrl     String?
+  avatarUrl          String?
+  /// 自定义头像对应的附件，防止头像文件被孤儿附件清理任务删除
+  avatarAttachmentId String?    @unique
   /// 在 Gitea 中对应的账号名，审核通过时自动创建
-  giteaUsername String?    @unique
+  giteaUsername      String?    @unique
   /// 审核信息
-  approvedById  String?
-  approvedAt    DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  approvedById       String?
+  approvedAt         DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
-  createdProjects Project[]       @relation("ProjectCreator")
-  ownedProjects   Project[]       @relation("ProjectOwner")
-  memberships     ProjectMember[]
-  claims          ProjectClaim[]
-  requesterOf     ProjectRequester[]
-  attachments     Attachment[]
-  feedbacks       Feedback[]
-  comments        FeedbackComment[]
-  notifications   Notification[]
-  createdPullReqs PullRequest[]   @relation("PullRequestAuthor")
+  createdProjects   Project[]          @relation("ProjectCreator")
+  ownedProjects     Project[]          @relation("ProjectOwner")
+  memberships       ProjectMember[]
+  claims            ProjectClaim[]
+  requesterOf       ProjectRequester[]
+  attachments       Attachment[]
+  avatarAttachment  Attachment?        @relation("UserAvatar", fields: [avatarAttachmentId], references: [id], onDelete: SetNull)
+  feedbacks         Feedback[]
+  comments          FeedbackComment[]
+  notifications     Notification[]
+  createdPullReqs   PullRequest[]      @relation("PullRequestAuthor")
+  projectUpdates    ProjectUpdate[]
+  integrationTokens IntegrationToken[]
+  agentAuditEvents  AgentAuditEvent[]
 
   @@index([status])
   @@map("users")
+}
+
+/// 面向 CLI / MCP 的个人访问令牌，只保存摘要与哈希，不保存明文
+model IntegrationToken {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  tokenHash   String    @unique
+  tokenPrefix String
+  scopes      String[]  @default([])
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auditEvents AgentAuditEvent[]
+
+  @@index([userId, revokedAt])
+  @@map("integration_tokens")
+}
+
+/// Agent / CLI 写操作审计记录
+model AgentAuditEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenId    String?
+  action     String
+  resource   String
+  resourceId String?
+  requestId  String?
+  input      Json?
+  createdAt  DateTime @default(now())
+
+  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token IntegrationToken? @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([resource, resourceId])
+  @@map("agent_audit_events")
 }
 
 /// 项目（需求单）
@@ -120,6 +185,8 @@ model Project {
   acceptanceCriteria String?
   /// 需求标签
   tags               String[]      @default([])
+  /// 需要的能力标签，与业务标签分离，用于匹配开发者
+  requiredSkills     String[]      @default([])
   /// 任务头像：预设标识（如 task-01），也兼容图片地址
   avatar             String?
   status             ProjectStatus @default(OPEN)
@@ -132,27 +199,52 @@ model Project {
   /// Gitea 仓库信息
   repoOwner          String?
   repoName           String?
+  /// 仓库中文别名，供需求卡片与成果页展示
+  repoDisplayName    String?
   repoUrl            String?
+  /// 成果展示地址（例如部署后的内部工具地址）
+  demoUrl            String?
   /// 认领时间
   claimedAt          DateTime?
   /// 发布时间
   releasedAt         DateTime?
+  /// 需求方完成试用验收的时间
+  acceptedAt         DateTime?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  creator       User               @relation("ProjectCreator", fields: [creatorId], references: [id])
-  owner         User?              @relation("ProjectOwner", fields: [ownerId], references: [id])
-  members       ProjectMember[]
-  claims        ProjectClaim[]
-  requesters    ProjectRequester[]
-  feedbacks     Feedback[]
-  pullReqs      PullRequest[]
-  attachments   Attachment[]
+  creator         User               @relation("ProjectCreator", fields: [creatorId], references: [id])
+  owner           User?              @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members         ProjectMember[]
+  claims          ProjectClaim[]
+  requesters      ProjectRequester[]
+  feedbacks       Feedback[]
+  pullReqs        PullRequest[]
+  attachments     Attachment[]
+  acceptanceItems AcceptanceItem[]
+  updates         ProjectUpdate[]
 
   @@index([status])
   @@index([creatorId])
   @@index([ownerId])
   @@map("projects")
+}
+
+/// 项目沟通与追加需求记录，不覆盖原始需求描述
+model ProjectUpdate {
+  id        String            @id @default(cuid())
+  projectId String
+  authorId  String
+  kind      ProjectUpdateKind
+  content   String
+  createdAt DateTime          @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@index([authorId])
+  @@map("project_updates")
 }
 
 /// 项目成员
@@ -172,18 +264,39 @@ model ProjectMember {
 
 /// 认领记录（保留完整历史，便于统计贡献度）
 model ProjectClaim {
-  id        String   @id @default(cuid())
-  projectId String
-  userId    String
+  id           String    @id @default(cuid())
+  projectId    String
+  userId       String
   /// 认领时的留言
-  remark    String?
-  createdAt DateTime @default(now())
+  remark       String?
+  /// 交还需求池的时间；保留认领历史，不删除记录
+  returnedAt   DateTime?
+  /// 交还原因
+  returnRemark String?
+  createdAt    DateTime  @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@map("project_claims")
+}
+
+/// 需求方试用时逐条确认的验收清单
+model AcceptanceItem {
+  id        String               @id @default(cuid())
+  projectId String
+  content   String
+  sort      Int                  @default(0)
+  result    AcceptanceItemResult @default(PENDING)
+  note      String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sort])
+  @@map("acceptance_items")
 }
 
 /// 共同需求人（一起提需求 / 关注的同事，不涉及仓库代码权限）
@@ -204,18 +317,18 @@ model ProjectRequester {
 
 /// 反馈（对应 Gitea 仓库中的 Issue）
 model Feedback {
-  id        String         @id @default(cuid())
-  projectId String
-  userId    String
-  type      FeedbackType   @default(BUG)
-  title     String
-  content   String
-  status    FeedbackStatus @default(OPEN)
+  id          String         @id @default(cuid())
+  projectId   String
+  userId      String
+  type        FeedbackType   @default(BUG)
+  title       String
+  content     String
+  status      FeedbackStatus @default(OPEN)
   /// 同步到 Gitea 后的 Issue 编号与地址
   issueNumber Int?
   issueUrl    String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user     User              @relation(fields: [userId], references: [id])
@@ -243,27 +356,27 @@ model FeedbackComment {
 
 /// Pull Request 快照（由 Gitea Webhook 同步）
 model PullRequest {
-  id           String    @id @default(cuid())
-  projectId    String
+  id          String    @id @default(cuid())
+  projectId   String
   /// PR 编号
-  number       Int
-  title        String
-  state        String    @default("open")
+  number      Int
+  title       String
+  state       String    @default("open")
   /// 是否已合并
-  merged       Boolean   @default(false)
+  merged      Boolean   @default(false)
   /// CI 状态：unknown / pending / success / failure
-  ciStatus     String    @default("unknown")
+  ciStatus    String    @default("unknown")
   /// 是否有冲突
-  hasConflict  Boolean   @default(false)
-  htmlUrl      String
-  authorId     String?
-  authorName   String
-  headBranch   String?
-  baseBranch   String?
-  mergedAt     DateTime?
-  closedAt     DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  hasConflict Boolean   @default(false)
+  htmlUrl     String
+  authorId    String?
+  authorName  String
+  headBranch  String?
+  baseBranch  String?
+  mergedAt    DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author  User?   @relation("PullRequestAuthor", fields: [authorId], references: [id])
@@ -291,8 +404,9 @@ model Attachment {
   storagePath String
   createdAt   DateTime       @default(now())
 
-  project  Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  uploader User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploader   User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  avatarUser User?    @relation("UserAvatar")
 
   @@index([projectId])
   @@index([uploaderId])

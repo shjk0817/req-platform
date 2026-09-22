@@ -33,6 +33,14 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  /** 获取开发环境账号选择器数据，随后仍走普通密码登录 */
+  @Public()
+  @Get('dev-users')
+  @ApiOperation({ summary: '获取开发环境可选账号' })
+  devUsers() {
+    return this.authService.getDevUsers();
+  }
+
   /** 查询当前登录用户信息 */
   @Get('me')
   @ApiBearerAuth()

@@ -22,6 +22,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { diskStorage } from 'multer';
+import { mkdirSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+
+/** Multer 临时落盘目录，文件通过服务层校验后移动到最终目录 */
+const UPLOAD_TEMP_DIR = process.env.UPLOAD_TEMP_DIR ?? '/tmp/aimanager-uploads';
 
 @ApiTags('附件')
 @Controller('uploads')
@@ -41,8 +47,17 @@ export class UploadsController {
   })
   @UseInterceptors(
     FileInterceptor('file', {
-      // 内存存储：统一在服务里做校验与命名，避免落盘半成品文件
-      limits: { fileSize: 30 * 1024 * 1024 },
+      // 先落盘到临时目录，避免大文件完整进入 Node 内存
+      storage: diskStorage({
+        destination: (_request, _file, callback) => {
+          mkdirSync(UPLOAD_TEMP_DIR, { recursive: true });
+          callback(null, UPLOAD_TEMP_DIR);
+        },
+        filename: (_request, _file, callback) => {
+          callback(null, `${randomUUID()}.upload`);
+        },
+      }),
+      limits: { fileSize: Number(process.env.UPLOAD_MAX_MB ?? 100) * 1024 * 1024 },
     }),
   )
   upload(@CurrentUser() user: AuthUser, @UploadedFile() file: UploadedFileLike): Promise<AttachmentDto> {
