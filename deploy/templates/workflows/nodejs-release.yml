@@ -1,0 +1,47 @@
+# ============================================================
+# 模板：Node.js 项目发布
+# 使用：复制到项目仓库 .gitea/workflows/nodejs-release.yml
+# 说明：不使用外网 Action，发布通过 Gitea API 完成，适配内网环境
+# ============================================================
+name: Node.js Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        env:
+          # Gitea 内置仓库令牌，用于拉取私有仓库
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          SERVER="${GITHUB_SERVER_URL#*//}"
+          URL="http://oauth2:${REPO_TOKEN}@${SERVER}/${GITHUB_REPOSITORY}.git"
+          git init -q .
+          git remote add origin "${URL}"
+          # 按提交拉取，兼容分支推送与 PR（PR 场景的 ref_name 是 PR 编号）
+          git fetch -q --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
+          echo "当前提交: $(git rev-parse --short HEAD)"
+
+      - name: 构建
+        run: |
+          npm ci || npm install
+          npm run build --if-present
+
+      - name: 打包
+        run: tar -czf "release-${GITHUB_REF_NAME}.tar.gz" --exclude=node_modules --exclude=.git .
+
+      - name: 发布 Release
+        run: |
+          set -e
+          curl -sS -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{\"tag_name\":\"${GITHUB_REF_NAME}\",\"name\":\"${GITHUB_REF_NAME}\",\"body\":\"由流水线自动创建的发布版本\"}" \
+            "${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}/releases" > /dev/null
+          echo "已创建 Release ${GITHUB_REF_NAME}"

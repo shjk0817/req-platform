@@ -1,0 +1,4 @@
+# 平台前端静态资源目录
+# 该目录由 Next.js 直接对外提供（见 Dockerfile 中的 public 拷贝）
+User-agent: *
+Disallow: /

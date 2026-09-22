@@ -1,0 +1,40 @@
+{{template "base/head" .}}
+<!--
+  自定义登录页（覆盖 Gitea 默认模板 templates/user/auth/signin.tmpl）
+  目的：把 Git 服务的入口页做成符合内部平台口径的页面：
+       引导员工从「需求协作平台」进入（平台会自动完成免密登录），
+       同时保留 Gitea 自身的账号密码登录作为兜底手段。
+-->
+<div role="main" aria-label="{{.Title}}" class="page-content user signin{{if .LinkAccountMode}} icon{{end}}">
+	{{template "user/auth/signin_navbar" .}}
+	<div class="ui middle very relaxed page grid">
+		<div class="ui container column fluid">
+			<div class="ui segment" style="border-left:4px solid #1677ff;background:#f6faff;">
+				<h3 style="margin:0 0 8px;">内部需求协作平台 · Git 服务</h3>
+				<p style="margin:0 0 6px;color:#555;">
+					员工账号由平台统一开通，无需在此注册。推荐从需求协作平台点击「代码仓库」进入，
+					平台会自动完成登录，不需要再输入一套 Git 密码。
+				</p>
+				<p style="margin:0 0 10px;color:#555;">
+					仓库统一放在 <code>projects</code> 组织下，命名规则为 <code>req-&lt;需求编号&gt;-&lt;标题&gt;</code>。
+				</p>
+				<a class="ui primary button" id="back-to-platform" href="/">返回需求协作平台</a>
+			</div>
+			{{template "user/auth/signin_inner" .}}
+		</div>
+	</div>
+</div>
+<script>
+	// 优先跳回来源页面（通常是需求协作平台）；拿不到来源时留在本页
+	(function () {
+		var link = document.getElementById('back-to-platform');
+		if (!link) {
+			return;
+		}
+		var from = document.referrer || '';
+		if (from && from.indexOf(window.location.host) === -1) {
+			link.href = from;
+		}
+	})();
+</script>
+{{template "base/footer" .}}

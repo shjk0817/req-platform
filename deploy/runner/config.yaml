@@ -1,0 +1,31 @@
+# ============================================================
+# Gitea act_runner 配置（挂载到容器 /config.yaml）
+# 说明：registration token 通过 GITEA_RUNNER_REGISTRATION_TOKEN_FILE 注入
+# ============================================================
+log:
+  # 日志级别：trace / debug / info / warn / error
+  level: info
+
+runner:
+  # 并发执行的任务数，按服务器核数调整
+  capacity: 4
+  # 拉取任务的时间间隔（Go duration 写法，例如 2s / 500ms）
+  fetch_interval: 2s
+  # 单个任务的最大执行时长
+  timeout: 3h
+  # 允许任务使用 docker 网络访问 gitea 与 api 容器
+  labels:
+    - "ubuntu-latest:docker://gitea/runner-images:ubuntu-latest"
+    - "ubuntu-22.04:docker://gitea/runner-images:ubuntu-22.04"
+
+container:
+  # 让流水线任务容器加入平台网络，从而能解析 gitea / api 容器名
+  # 作用：checkout 代码可访问 Gitea，流水线结束后可回调平台回写 CI 状态
+  network: "aimanager_backend"
+
+cache:
+  # 启用 Actions 缓存，加速重复构建
+  enabled: true
+  dir: /data/cache
+  host: ""
+  port: 0

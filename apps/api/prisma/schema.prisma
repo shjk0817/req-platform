@@ -1,0 +1,318 @@
+// ============================================================
+// Prisma 数据模型定义
+// 说明：平台核心实体为 用户 / 需求项目 / 项目成员 / 认领记录 /
+//       反馈 / 反馈评论 / Pull Request 快照 / 通知
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// 用户角色
+enum Role {
+  EMPLOYEE // 普通员工：可提需求、可认领项目
+  ADMIN // 平台管理员：审核账号、管理所有项目
+}
+
+/// 用户状态：邮箱注册后需管理员审核通过才能使用
+enum UserStatus {
+  PENDING // 待审核
+  ACTIVE // 正常
+  DISABLED // 已停用
+}
+
+/// 项目状态流转
+enum ProjectStatus {
+  OPEN // 需求已发布，等待认领
+  CLAIMED // 已被认领，准备开发
+  DEVELOPING // 开发中（存在进行中的 PR）
+  RELEASED // 已发布
+  CLOSED // 已关闭（不再维护）
+}
+
+/// 项目成员角色
+enum MemberRole {
+  OWNER // 项目负责人（认领人）
+  COLLABORATOR // 协作者
+}
+
+/// 反馈类型
+enum FeedbackType {
+  BUG // 缺陷
+  IMPROVEMENT // 改进建议
+  QUESTION // 使用咨询
+}
+
+/// 反馈状态
+enum FeedbackStatus {
+  OPEN // 待处理
+  PROCESSING // 处理中
+  RESOLVED // 已解决
+  CLOSED // 已关闭
+}
+
+/// 通知类型
+enum NotificationType {
+  USER_APPROVED // 账号审核通过
+  PROJECT_CLAIMED // 项目被认领
+  PROJECT_MEMBER_ADDED // 被加入项目
+  PROJECT_REQUESTER_ADDED // 有同事加入共同需求人
+  FEEDBACK_CREATED // 项目收到新反馈
+  PR_UPDATED // PR 状态变更
+  CI_FINISHED // CI 流水线结束
+}
+
+/// 附件类型
+enum AttachmentKind {
+  IMAGE // 图片：在需求页以画廊形式展示
+  FILE // 普通附件：提供下载
+}
+
+/// 用户
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String
+  password      String
+  role          Role       @default(EMPLOYEE)
+  status        UserStatus @default(PENDING)
+  /// 能力标签，用于需求方筛选合适的开发者
+  skills        String[]   @default([])
+  department    String?
+  /// 头像：优先存预设标识（如 user-01），也兼容图片地址
+  avatarUrl     String?
+  /// 在 Gitea 中对应的账号名，审核通过时自动创建
+  giteaUsername String?    @unique
+  /// 审核信息
+  approvedById  String?
+  approvedAt    DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  createdProjects Project[]       @relation("ProjectCreator")
+  ownedProjects   Project[]       @relation("ProjectOwner")
+  memberships     ProjectMember[]
+  claims          ProjectClaim[]
+  requesterOf     ProjectRequester[]
+  attachments     Attachment[]
+  feedbacks       Feedback[]
+  comments        FeedbackComment[]
+  notifications   Notification[]
+  createdPullReqs PullRequest[]   @relation("PullRequestAuthor")
+
+  @@index([status])
+  @@map("users")
+}
+
+/// 项目（需求单）
+model Project {
+  id                 String        @id @default(cuid())
+  /// 需求标题
+  title              String
+  /// 需求详细描述
+  description        String
+  /// 验收标准
+  acceptanceCriteria String?
+  /// 需求标签
+  tags               String[]      @default([])
+  /// 任务头像：预设标识（如 task-01），也兼容图片地址
+  avatar             String?
+  status             ProjectStatus @default(OPEN)
+  /// 期望交付时间
+  expectedAt         DateTime?
+  /// 需求方
+  creatorId          String
+  /// 项目负责人（认领人）
+  ownerId            String?
+  /// Gitea 仓库信息
+  repoOwner          String?
+  repoName           String?
+  repoUrl            String?
+  /// 认领时间
+  claimedAt          DateTime?
+  /// 发布时间
+  releasedAt         DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  creator       User               @relation("ProjectCreator", fields: [creatorId], references: [id])
+  owner         User?              @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members       ProjectMember[]
+  claims        ProjectClaim[]
+  requesters    ProjectRequester[]
+  feedbacks     Feedback[]
+  pullReqs      PullRequest[]
+  attachments   Attachment[]
+
+  @@index([status])
+  @@index([creatorId])
+  @@index([ownerId])
+  @@map("projects")
+}
+
+/// 项目成员
+model ProjectMember {
+  id        String     @id @default(cuid())
+  projectId String
+  userId    String
+  role      MemberRole @default(COLLABORATOR)
+  createdAt DateTime   @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+/// 认领记录（保留完整历史，便于统计贡献度）
+model ProjectClaim {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  /// 认领时的留言
+  remark    String?
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_claims")
+}
+
+/// 共同需求人（一起提需求 / 关注的同事，不涉及仓库代码权限）
+model ProjectRequester {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_requesters")
+}
+
+/// 反馈（对应 Gitea 仓库中的 Issue）
+model Feedback {
+  id        String         @id @default(cuid())
+  projectId String
+  userId    String
+  type      FeedbackType   @default(BUG)
+  title     String
+  content   String
+  status    FeedbackStatus @default(OPEN)
+  /// 同步到 Gitea 后的 Issue 编号与地址
+  issueNumber Int?
+  issueUrl    String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User              @relation(fields: [userId], references: [id])
+  comments FeedbackComment[]
+
+  @@index([projectId])
+  @@index([status])
+  @@map("feedbacks")
+}
+
+/// 反馈评论（平台内讨论，同时同步到 Gitea Issue 评论）
+model FeedbackComment {
+  id         String   @id @default(cuid())
+  feedbackId String
+  userId     String
+  content    String
+  createdAt  DateTime @default(now())
+
+  feedback Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([feedbackId])
+  @@map("feedback_comments")
+}
+
+/// Pull Request 快照（由 Gitea Webhook 同步）
+model PullRequest {
+  id           String    @id @default(cuid())
+  projectId    String
+  /// PR 编号
+  number       Int
+  title        String
+  state        String    @default("open")
+  /// 是否已合并
+  merged       Boolean   @default(false)
+  /// CI 状态：unknown / pending / success / failure
+  ciStatus     String    @default("unknown")
+  /// 是否有冲突
+  hasConflict  Boolean   @default(false)
+  htmlUrl      String
+  authorId     String?
+  authorName   String
+  headBranch   String?
+  baseBranch   String?
+  mergedAt     DateTime?
+  closedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User?   @relation("PullRequestAuthor", fields: [authorId], references: [id])
+
+  @@unique([projectId, number])
+  @@index([projectId])
+  @@map("pull_requests")
+}
+
+/// 需求附件（图片 / 文件）
+/// 说明：发布需求时先上传拿到附件 id，再随需求一起提交（projectId 由后端回填），
+///      未被任何需求引用的附件会由定时任务清理，避免磁盘堆积
+model Attachment {
+  id          String         @id @default(cuid())
+  /// 关联需求；为 null 表示已上传但尚未挂到需求上
+  projectId   String?
+  uploaderId  String
+  kind        AttachmentKind @default(FILE)
+  /// 原始文件名（下载时回显）
+  name        String
+  mime        String
+  /// 文件大小（字节）
+  size        Int
+  /// 相对存储路径，例如 2026/09/ckxxxx-report.pdf
+  storagePath String
+  createdAt   DateTime       @default(now())
+
+  project  Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploader User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([uploaderId])
+  @@map("attachments")
+}
+
+/// 站内通知
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  content   String
+  /// 跳转链接（平台内相对路径）
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
+}

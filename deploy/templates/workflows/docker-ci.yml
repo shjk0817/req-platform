@@ -1,0 +1,46 @@
+# ============================================================
+# 模板：容器镜像构建与推送
+# 使用：复制到项目仓库 .gitea/workflows/docker-ci.yml，
+#       并把 __REGISTRY__ 替换为内部镜像仓库地址
+# 说明：不使用外网 Action，全部用 shell 完成，适配内网环境
+#       需在仓库密钥中配置 REGISTRY_USER / REGISTRY_PASSWORD
+# ============================================================
+name: Docker CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        env:
+          # Gitea 内置仓库令牌，用于拉取私有仓库
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          SERVER="${GITHUB_SERVER_URL#*//}"
+          URL="http://oauth2:${REPO_TOKEN}@${SERVER}/${GITHUB_REPOSITORY}.git"
+          git init -q .
+          git remote add origin "${URL}"
+          # 按提交拉取，兼容分支推送与 PR（PR 场景的 ref_name 是 PR 编号）
+          git fetch -q --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
+          echo "当前提交: $(git rev-parse --short HEAD)"
+
+      - name: 构建镜像
+        run: |
+          IMAGE="__REGISTRY__/${GITHUB_REPOSITORY##*/}:${GITHUB_REF_NAME}"
+          docker build -t "${IMAGE}" .
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+
+      - name: 推送镜像
+        run: |
+          echo "${REGISTRY_PASSWORD}" | docker login __REGISTRY__ -u "${REGISTRY_USER}" --password-stdin
+          docker push "${IMAGE}"
+        env:
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}

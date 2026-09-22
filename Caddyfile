@@ -1,0 +1,55 @@
+# ============================================================
+# Caddy 反向代理配置
+# - app.*   -> 自研需求协作平台前端 + 后端 API（同域 /api）
+# - git.*   -> Gitea（仓库/PR/Issue/CI）
+#
+# 站点地址由环境变量提供，写法决定是否启用 TLS：
+#   生产环境：APP_ADDR=app.example.com      （Caddy 自动申请 Let's Encrypt 证书）
+#   本地调试：APP_ADDR=http://app.localhost  （纯 HTTP，便于自定义端口）
+# ============================================================
+
+{
+	# 生产环境请填写真实邮箱，用于 ACME 证书通知
+	email {$ACME_EMAIL:admin@example.com}
+}
+
+# 自研平台前端 + 后端 API
+{$APP_ADDR:app.localhost} {
+	encode zstd gzip
+
+	# 接口请求转发到后端容器
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	# 其余请求交给 Next.js
+	handle {
+		reverse_proxy web:3000
+	}
+}
+
+# Gitea 服务端（含 Git HTTP 协议、Webhook、Actions 日志）
+{$GITEA_ADDR:git.localhost} {
+	encode zstd gzip
+
+	# 无需平台登录态校验的请求：
+	#   1. 静态资源与站点基础文件（否则未登录用户看不到图标）
+	#   2. Gitea 自身的登录 / 登出 / 找回密码入口：SSO 失效时仍可用密码登录
+	#   3. Git 协议路径（*.git）：git 客户端用 Basic/Token 认证，不携带浏览器 Cookie
+	# 注意：Caddy 同一 @matcher 内多个匹配器是「与」关系，且同名只能定义一次，
+	#      因此这里用一条正则把各类放行路径「或」起来
+	@gitea_bypass path_regexp ^/(api|assets|avatars|repo-avatars|serviceworker\.js|robots\.txt|favicon\.svg|favicon\.png|apple-touch-icon\.png|manifest\.webmanifest|user/(login|logout|forgot_password|oauth2))|\.git(/|$)
+
+	handle @gitea_bypass {
+		reverse_proxy gitea:3000
+	}
+
+	# 其余页面请求：先向平台校验登录态，成功则把 Gitea 用户名透传给 Gitea 完成免密登录
+	handle {
+		forward_auth api:4000 {
+			uri /api/auth/gitea-verify
+			copy_headers X-Gitea-User X-Gitea-Email
+		}
+		reverse_proxy gitea:3000
+	}
+}

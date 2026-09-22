@@ -1,0 +1,85 @@
+# ============================================================
+# 发布流水线：推送 v* 标签时构建产物并创建 Release
+# 说明：
+#   1. 不使用外网 Action，全部用 shell + Gitea API 完成
+#   2. 末尾的「上报流水线状态」步骤会把结果回写平台（请勿删除）
+# ============================================================
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  # 平台流水线回调地址与令牌（由平台在建仓时自动填充）
+  CI_CALLBACK_URL: __CI_CALLBACK_URL__
+  CI_CALLBACK_TOKEN: __CI_CALLBACK_TOKEN__
+  CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  # 真实分支名：PR 事件下 ref_name 是 PR 编号，需用 head_ref
+  CI_BRANCH: ${{ github.head_ref || github.ref_name }}
+
+jobs:
+  release:
+    name: 构建并发布
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        env:
+          # Gitea 内置仓库令牌，用于拉取私有仓库
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          SERVER="${GITHUB_SERVER_URL#*//}"
+          URL="http://oauth2:${REPO_TOKEN}@${SERVER}/${GITHUB_REPOSITORY}.git"
+          git init -q .
+          git remote add origin "${URL}"
+          # 按提交拉取，兼容分支推送与 PR（PR 场景的 ref_name 是 PR 编号）
+          git fetch -q --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
+          echo "当前提交: $(git rev-parse --short HEAD)"
+
+      - name: 安装依赖并构建
+        run: |
+          if [ -f package.json ]; then
+            npm ci || npm install
+            npm run build --if-present
+          else
+            echo "未检测到 package.json，跳过构建"
+          fi
+
+      - name: 打包产物
+        run: |
+          mkdir -p dist
+          if [ -f package.json ]; then
+            tar -czf "release-${GITHUB_REF_NAME}.tar.gz" --exclude=node_modules --exclude=.git .
+          else
+            echo "无可打包产物" > "release-${GITHUB_REF_NAME}.tar.gz"
+          fi
+
+      - name: 创建 Gitea Release
+        run: |
+          set -e
+          SERVER="${GITHUB_SERVER_URL#*//}"
+          curl -sS -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{\"tag_name\":\"${GITHUB_REF_NAME}\",\"name\":\"${GITHUB_REF_NAME}\",\"body\":\"由流水线自动创建的发布版本\"}" \
+            "${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}/releases" > /dev/null
+          echo "已创建 Release ${GITHUB_REF_NAME}（服务器: ${SERVER}）"
+
+      - name: 上报流水线状态（成功）
+        if: success()
+        run: |
+          curl -sS -X POST "${CI_CALLBACK_URL}" \
+            -H 'Content-Type: application/json' \
+            -H "X-CI-Token: ${CI_CALLBACK_TOKEN}" \
+            -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"branch\":\"${CI_BRANCH}\",\"status\":\"success\",\"workflow\":\"Release\",\"runUrl\":\"${CI_RUN_URL}\",\"sha\":\"${GITHUB_SHA}\"}" || true
+
+      - name: 上报流水线状态（失败）
+        if: failure()
+        run: |
+          curl -sS -X POST "${CI_CALLBACK_URL}" \
+            -H 'Content-Type: application/json' \
+            -H "X-CI-Token: ${CI_CALLBACK_TOKEN}" \
+            -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"branch\":\"${CI_BRANCH}\",\"status\":\"failure\",\"workflow\":\"Release\",\"runUrl\":\"${CI_RUN_URL}\",\"sha\":\"${GITHUB_SHA}\"}" || true

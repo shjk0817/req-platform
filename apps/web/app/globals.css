@@ -1,0 +1,265 @@
+/* 全局样式：仅保留必要的重置与布局辅助类 */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  background: #f5f6fa;
+}
+
+/* 主内容区域内边距 */
+.page-container {
+  padding: 20px 24px 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* 卡片间距 */
+.stack > * + * {
+  margin-top: 16px;
+}
+
+/* 描述型文本 */
+.text-muted {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+}
+
+/* 需求描述保留换行 */
+.pre-wrap {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------------- 预设头像选择器 ---------------- */
+.avatar-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  /* 头像选择面板：限制最大宽度与高度，避免 18 个头像铺满整屏 */
+  max-width: 340px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+/* 当前头像预览：圆形，插画会溢出裁切 */
+.avatar-picker-current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.06);
+}
+
+.avatar-picker-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.avatar-picker-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+.avatar-picker-item.is-active {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.18);
+}
+
+.avatar-picker-check {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  padding: 2px;
+  color: #fff;
+  font-size: 10px;
+  background: #1677ff;
+  border-radius: 50%;
+}
+
+/* ---------------- 贡献热力图 ---------------- */
+.heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.heatmap-months {
+  display: grid;
+  margin-bottom: 4px;
+  margin-left: 26px;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.heatmap-months > span {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.heatmap-body {
+  display: flex;
+  gap: 6px;
+}
+
+.heatmap-weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, 13px);
+  gap: 3px;
+  width: 20px;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.heatmap-weekdays > span:nth-child(1) {
+  grid-row: 1;
+}
+
+.heatmap-weekdays > span:nth-child(2) {
+  grid-row: 3;
+}
+
+.heatmap-weekdays > span:nth-child(3) {
+  grid-row: 5;
+}
+
+.heatmap-grid {
+  display: grid;
+}
+
+.heatmap-cell {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+
+.heatmap-cell.is-today {
+  outline: 1px solid #1677ff;
+  outline-offset: 1px;
+}
+
+.heatmap-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.heatmap-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.heatmap-legend i {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+}
+
+/* 需求池中的进度条：压缩行高，便于表格展示 */
+.progress-cell .ant-progress {
+  margin: 0;
+}
+
+/* ---------------- 需求池卡片 ---------------- */
+.project-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 卡片标题：最多两行，避免标题长短不一把卡片撑变形 */
+.project-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+/* 卡片底部的操作提示：整卡可点击后，用一句浅色说明替代原来的「查看详情」按钮 */
+.project-card-hint {
+  font-size: 12px;
+}
+
+/* 卡片描述：固定两行高度，保证同一行卡片底部对齐 */
+.project-card-desc {
+  min-height: 44px;
+  margin-bottom: 0 !important;
+}
+
+/* 卡片信息区固定在操作按钮之上 */
+.project-card-meta {
+  margin-top: auto;
+}
+
+/* 圆环进度中间的状态文字 */
+.project-ring-text {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+}
+
+.project-ring-status {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.project-ring-percent {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+/* ---------------- 首页统计卡片（可点击跳转） ---------------- */
+.stat-card-link {
+  display: block;
+  color: inherit;
+}
+
+.stat-card-link:hover {
+  color: inherit;
+}
+
+.stat-card-link .ant-card {
+  height: 100%;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.stat-card-link:hover .ant-card {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.stat-card-hint {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #1677ff;
+}

@@ -1,0 +1,104 @@
+# ============================================================
+# 通用 CI 流水线：代码检查 + 单元测试 + 构建
+# 触发：推送到任意分支、向 main 提交 PR
+# 说明：
+#   1. 为适配内网环境，这里不使用 GitHub Marketplace 上的 Action，
+#      全部改用 shell 完成（避免依赖外网 github.com）
+#   2. 末尾的「上报流水线状态」步骤会把结果回写平台（请勿删除）
+# ============================================================
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  # 平台流水线回调地址与令牌（由平台在建仓时自动填充）
+  CI_CALLBACK_URL: __CI_CALLBACK_URL__
+  CI_CALLBACK_TOKEN: __CI_CALLBACK_TOKEN__
+  CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  # 真实分支名：PR 事件下 ref_name 是 PR 编号，需用 head_ref
+  CI_BRANCH: ${{ github.head_ref || github.ref_name }}
+
+jobs:
+  verify:
+    name: 检查与测试
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        env:
+          # Gitea 内置仓库令牌，用于拉取私有仓库
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          SERVER="${GITHUB_SERVER_URL#*//}"
+          URL="http://oauth2:${REPO_TOKEN}@${SERVER}/${GITHUB_REPOSITORY}.git"
+          git init -q .
+          git remote add origin "${URL}"
+          # 按提交拉取，兼容分支推送与 PR（PR 场景的 ref_name 是 PR 编号）
+          git fetch -q --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
+          echo "当前提交: $(git rev-parse --short HEAD)"
+
+      - name: 环境检查
+        run: |
+          echo "提交: ${GITHUB_SHA}"
+          echo "分支: ${GITHUB_REF_NAME}"
+          if command -v node >/dev/null 2>&1; then
+            node -v
+          else
+            echo "运行环境未预装 Node.js，请按项目技术栈在流水线中自行安装"
+          fi
+
+      # 根据项目实际技术栈调整以下步骤；无 package.json 时自动跳过
+      - name: 安装依赖
+        run: |
+          if [ -f package.json ]; then
+            npm ci || npm install
+          else
+            echo "未检测到 package.json，跳过依赖安装"
+          fi
+
+      - name: 代码检查
+        run: |
+          if [ -f package.json ] && npm run | grep -q " lint"; then
+            npm run lint
+          else
+            echo "未配置 lint，跳过"
+          fi
+
+      - name: 单元测试
+        run: |
+          if [ -f package.json ] && npm run | grep -q " test"; then
+            npm test
+          else
+            echo "未配置 test，跳过"
+          fi
+
+      - name: 构建
+        run: |
+          if [ -f package.json ] && npm run | grep -q " build"; then
+            npm run build
+          else
+            echo "未配置 build，跳过"
+          fi
+
+      - name: 上报流水线状态（成功）
+        if: success()
+        run: |
+          curl -sS -X POST "${CI_CALLBACK_URL}" \
+            -H 'Content-Type: application/json' \
+            -H "X-CI-Token: ${CI_CALLBACK_TOKEN}" \
+            -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"branch\":\"${CI_BRANCH}\",\"status\":\"success\",\"workflow\":\"CI\",\"runUrl\":\"${CI_RUN_URL}\",\"sha\":\"${GITHUB_SHA}\"}" || true
+
+      - name: 上报流水线状态（失败）
+        if: failure()
+        run: |
+          curl -sS -X POST "${CI_CALLBACK_URL}" \
+            -H 'Content-Type: application/json' \
+            -H "X-CI-Token: ${CI_CALLBACK_TOKEN}" \
+            -d "{\"repo\":\"${GITHUB_REPOSITORY}\",\"branch\":\"${CI_BRANCH}\",\"status\":\"failure\",\"workflow\":\"CI\",\"runUrl\":\"${CI_RUN_URL}\",\"sha\":\"${GITHUB_SHA}\"}" || true
