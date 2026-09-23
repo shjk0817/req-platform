@@ -77,13 +77,18 @@ export async function requestApproval(
   payload: Record<string, unknown>,
 ): Promise<{ approved: boolean; action?: PendingAction }> {
   const action = createPendingAction(kind, payload);
-  const elicit = (extra as { mcpReq?: { elicitInput?: (input: unknown) => Promise<{ action: string }> } } | undefined)
-    ?.mcpReq?.elicitInput;
+  const mcpReq = (extra as {
+    mcpReq?: {
+      elicitInput?: (input: unknown) => Promise<{ action: string; content?: { confirm?: boolean } }>;
+    };
+  } | undefined)
+    ?.mcpReq;
+  const elicit = mcpReq?.elicitInput;
   if (typeof elicit !== 'function') {
     return { approved: false, action };
   }
   try {
-    const result = await elicit({
+    const result = await elicit.call(mcpReq, {
       mode: 'form',
       message: confirmationMessage(action),
       requestedSchema: {
@@ -92,7 +97,7 @@ export async function requestApproval(
         required: ['confirm'],
       },
     });
-    if (result.action === 'accept') {
+    if (result.action === 'accept' && result.content?.confirm === true) {
       const consumed = consumePendingAction(action.id);
       return { approved: true, action: consumed };
     }

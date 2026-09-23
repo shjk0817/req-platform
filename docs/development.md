@@ -4,8 +4,9 @@
 
 | 目录 | 说明 |
 | --- | --- |
-| `apps/api` | NestJS 后端：认证、用户、需求/项目、反馈、Gitea 集成、通知、定时任务 |
+| `apps/api` | NestJS 后端：认证、用户、需求/项目、反馈、Gitea 集成、通知、Agent API |
 | `apps/web` | Next.js 前端：登录注册、需求池、项目看板、反馈、通知、后台用户管理 |
+| `apps/agent-tools` | `aim` CLI、远程 MCP、本地 stdio MCP、Git 安全执行层 |
 | `deploy/` | Gitea / Runner 配置、仓库模板与流水线模板 |
 | `scripts/` | 端到端验收脚本 |
 
@@ -61,6 +62,19 @@ npm run build
 docker compose up -d --build api web
 bash scripts/e2e-test.sh
 ```
+
+### Agent tools 验证
+
+```bash
+cd apps/agent-tools
+npm ci
+npm run lint
+npm test
+npm run pack:check
+```
+
+`npm test` 包含临时 HTTP 服务上的 Agent API 客户端协议测试、真实 MCP SDK
+initialize 握手、CLI 命令输出和 Git 安全测试；不需要登录平台或连接 Gitea。
 
 ## 六、改数据模型
 

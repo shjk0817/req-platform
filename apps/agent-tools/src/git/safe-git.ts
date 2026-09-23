@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { promisify } from 'node:util';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { ProjectGitInfo } from '../types.js';
+import { loadConfig } from '../config.js';
 
 const execFileAsync = promisify(execFile);
 const DANGEROUS_ARGS = new Set(['--force', '-f', '--mirror', '--all', '--delete']);
@@ -170,8 +171,19 @@ function assertRemoteUrl(remote: string): void {
   if (!remote || remote.startsWith('-') || /:\/\/[^/]*:[^@]+@/.test(remote)) {
     throw new GitSafetyError('Git 远程地址为空、包含选项或内嵌凭据');
   }
-  if (!/^git@[^:]+:[^/]+\/[^/]+(?:\.git)?$/.test(remote) && !/^ssh:\/\/git@[^/]+(?::\d+)?\/[^/]+\/[^/]+(?:\.git)?$/.test(remote) && !/^https?:\/\/[^/]+\/[^/]+\/[^/]+(?:\.git)?$/.test(remote)) {
+  const scp = remote.match(/^git@([^:]+):([^/]+)\/([^/]+)(?:\.git)?$/);
+  const ssh = remote.match(/^ssh:\/\/git@([^/:]+)(?::\d+)?\/([^/]+)\/([^/]+)(?:\.git)?$/);
+  const http = remote.match(/^https?:\/\/([^/]+)\/([^/]+)\/([^/]+)(?:\.git)?$/);
+  const match = scp ?? ssh ?? http;
+  if (!match) {
     throw new GitSafetyError('Git 远程地址格式不受支持');
+  }
+  const [, rawHost, owner] = match;
+  const host = rawHost.split(':')[0];
+  const config = loadConfig();
+  const allowedHost = new URL(config.giteaUrl).hostname;
+  if (host !== allowedHost || owner !== config.giteaOrg) {
+    throw new GitSafetyError(`Git 远程地址必须指向受信任的 Gitea 主机与组织：${config.giteaOrg}`);
   }
 }
 

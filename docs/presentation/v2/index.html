@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>aiManager · 痛点与解决方案（10 页）</title>
+  <style>
+    /* 暖色 parchment 汇报 — 16:9，侧重痛点↔方案对照 */
+    :root {
+      --parchment: #f7f7f4;
+      --bone: #f2f1ed;
+      --ink: #26251e;
+      --mist: #a1a19f;
+      --ember: #f54e00;
+      --forest: #34785c;
+      --pain-bg: #fff5f0;
+      --solve-bg: #f0f7f3;
+      --radius: 4px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #1a1916;
+      color: var(--ink);
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .deck {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .stage {
+      width: min(100%, calc((100vh - 80px) * 16 / 9));
+      aspect-ratio: 16 / 9;
+      background: var(--parchment);
+      border: 1px solid #cdcdc9;
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 8px 32px rgba(38, 37, 30, 0.35);
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+      padding: 4.5% 5.5%;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(245, 78, 0, 0.04), transparent 45%),
+        radial-gradient(circle at 0% 100%, rgba(52, 120, 92, 0.05), transparent 40%),
+        var(--parchment);
+    }
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .slide h1 {
+      font-size: clamp(26px, 3.8vw, 48px);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .slide h2 {
+      font-size: clamp(20px, 2.6vw, 36px);
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.55em;
+      padding-bottom: 0.35em;
+      border-bottom: 3px solid var(--ember);
+      width: fit-content;
+    }
+    .slide .subtitle {
+      margin-top: 0.5em;
+      font-size: clamp(15px, 1.6vw, 22px);
+      color: var(--mist);
+    }
+    .slide .tagline {
+      margin-top: 1.2em;
+      font-size: clamp(16px, 1.75vw, 24px);
+      color: var(--ink);
+    }
+    .slide .tagline strong { color: var(--ember); font-weight: 600; }
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 1.4em;
+    }
+    .pill {
+      padding: 0.45em 0.9em;
+      border: 1px solid #cdcdc9;
+      border-radius: 999px;
+      font-size: clamp(12px, 1.2vw, 16px);
+      background: var(--bone);
+    }
+    .cover-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(8px, 2vw, 28px);
+      margin-top: auto;
+      margin-bottom: 8%;
+      flex-wrap: wrap;
+    }
+    .cover-step {
+      text-align: center;
+      max-width: 140px;
+    }
+    .cover-step .icon {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 8px;
+      border-radius: 50%;
+      border: 1px solid #cdcdc9;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+    .cover-step span {
+      display: block;
+      font-size: clamp(13px, 1.25vw, 17px);
+      font-weight: 500;
+    }
+    .cover-step small {
+      color: var(--mist);
+      font-size: clamp(11px, 1vw, 14px);
+    }
+    .cover-arrow { color: var(--mist); font-size: 20px; }
+    .underline-accent {
+      display: inline-block;
+      border-bottom: 4px solid var(--ember);
+      padding-bottom: 2px;
+    }
+    ul.plain {
+      list-style: none;
+      font-size: clamp(14px, 1.45vw, 20px);
+      line-height: 1.65;
+    }
+    ul.plain li {
+      margin: 0.4em 0;
+      padding-left: 1.15em;
+      position: relative;
+    }
+    ul.plain li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 6px;
+      height: 6px;
+      background: var(--forest);
+      border-radius: 1px;
+    }
+    .grid-5 {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-top: 1em;
+      flex: 1;
+      align-content: start;
+    }
+    @media (max-width: 900px) {
+      .grid-5 { grid-template-columns: repeat(2, 1fr); }
+    }
+    .mini-card {
+      border: 1px solid #cdcdc9;
+      border-radius: var(--radius);
+      padding: 12px 10px;
+      background: #fff;
+      font-size: clamp(11px, 1.05vw, 15px);
+      line-height: 1.45;
+      min-height: 100px;
+    }
+    .mini-card .num {
+      color: var(--ember);
+      font-weight: 700;
+      font-size: 1.1em;
+      margin-bottom: 6px;
+    }
+    .mini-card .pain { color: #8a3b1a; margin-bottom: 8px; }
+    .mini-card .arrow { color: var(--mist); margin: 4px 0; }
+    .mini-card .solve { color: var(--forest); font-weight: 500; }
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 14px;
+      flex: 1;
+      align-items: stretch;
+      margin-top: 0.6em;
+    }
+    .pair-box {
+      border-radius: var(--radius);
+      padding: 4% 4.5%;
+      border: 1px solid #cdcdc9;
+    }
+    .pair-box.pain {
+      background: var(--pain-bg);
+      border-color: rgba(245, 78, 0, 0.25);
+    }
+    .pair-box.solve {
+      background: var(--solve-bg);
+      border-color: rgba(52, 120, 92, 0.3);
+    }
+    .pair-box h3 {
+      font-size: clamp(14px, 1.35vw, 18px);
+      margin-bottom: 0.65em;
+      font-weight: 600;
+    }
+    .pair-box.pain h3 { color: #c2410c; }
+    .pair-box.solve h3 { color: var(--forest); }
+    .pair-box p, .pair-box li {
+      font-size: clamp(13px, 1.3vw, 18px);
+      line-height: 1.55;
+    }
+    .pair-box ul {
+      list-style: none;
+      margin-top: 0.35em;
+    }
+    .pair-box li {
+      margin: 0.35em 0;
+      padding-left: 1em;
+      position: relative;
+    }
+    .pair-box.pain li::before {
+      content: "×";
+      position: absolute;
+      left: 0;
+      color: var(--ember);
+      font-weight: 700;
+    }
+    .pair-box.solve li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--forest);
+      font-weight: 700;
+    }
+    .pair-mid {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ember);
+      font-size: clamp(22px, 2.5vw, 36px);
+      font-weight: 300;
+    }
+    .slide-note {
+      margin-top: auto;
+      font-size: clamp(11px, 1vw, 14px);
+      color: var(--mist);
+      border-top: 1px solid #e5e5e2;
+      padding-top: 0.6em;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 0.8em;
+      flex: 1;
+    }
+    .summary-card {
+      border: 1px solid #cdcdc9;
+      border-radius: var(--radius);
+      padding: 14px;
+      background: #fff;
+    }
+    .summary-card h3 {
+      font-size: clamp(13px, 1.25vw, 17px);
+      color: var(--forest);
+      margin-bottom: 8px;
+    }
+    .summary-card p {
+      font-size: clamp(12px, 1.15vw, 16px);
+      line-height: 1.5;
+      color: var(--ink);
+    }
+    .brand-footer {
+      text-align: center;
+      margin-top: auto;
+      font-size: clamp(14px, 1.4vw, 20px);
+      font-weight: 500;
+    }
+    .brand-footer em {
+      font-style: normal;
+      color: var(--mist);
+      display: block;
+      font-size: 0.85em;
+      margin-top: 6px;
+      font-weight: 400;
+    }
+    .toolbar {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      color: #e6e5e0;
+      font-size: 14px;
+    }
+    .toolbar button {
+      background: var(--bone);
+      color: var(--ink);
+      border: 1px solid #cdcdc9;
+      border-radius: var(--radius);
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .toolbar button:hover { background: #fff; }
+    .toolbar .count { min-width: 5em; text-align: center; }
+    .toolbar a {
+      color: #e6e5e0;
+      margin-left: 8px;
+      font-size: 13px;
+    }
+    @media print {
+      body { background: white; }
+      .deck { padding: 0; }
+      .toolbar { display: none; }
+      .stage { width: 100%; box-shadow: none; border: none; }
+      .slide { position: relative; opacity: 1 !important; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+    <div class="stage" id="stage">
+      <!-- 1 封面 -->
+      <section class="slide active" data-index="0">
+        <h1><span class="underline-accent">痛点与解决方案</span></h1>
+        <p class="subtitle">内部需求协作平台 · aiManager</p>
+        <p class="tagline">把「口头找人」变成 <strong>需求到交付</strong> 的可追溯闭环</p>
+        <div class="pill-row">
+          <span class="pill">结构化需求池</span>
+          <span class="pill">Gitea + Actions</span>
+          <span class="pill">反馈 → Issue</span>
+          <span class="pill">MCP / aim CLI</span>
+        </div>
+        <div class="cover-flow">
+          <div class="cover-step">
+            <div class="icon">📋</div>
+            <span>痛点</span>
+            <small>协作失序</small>
+          </div>
+          <span class="cover-arrow">→</span>
+          <div class="cover-step">
+            <div class="icon">⚙️</div>
+            <span>平台能力</span>
+            <small>流程固化</small>
+          </div>
+          <span class="cover-arrow">→</span>
+          <div class="cover-step">
+            <div class="icon">🌿</div>
+            <span>可持续迭代</span>
+            <small>交付后有人管</small>
+          </div>
+        </div>
+        <p class="slide-note">优化版汇报 · 共 10 页 · 打开方式：浏览器全屏播放</p>
+      </section>
+
+      <!-- 2 场景 -->
+      <section class="slide" data-index="1">
+        <h2>我们面对的真实场景</h2>
+        <ul class="plain">
+          <li>业务同事有想法、有工具需求，但<strong>不会写代码</strong>，只能私下找认识的开发</li>
+          <li>开发同事各自为战，<strong>不知道需求池里还有什么</strong>，重复功能被做多遍</li>
+          <li>小项目缺少统一仓库、PR、CI，<strong>交付质量与过程不可见</strong></li>
+          <li>上线后问题通过聊天反馈，<strong>没有工单、没有负责人</strong>，迭代很快断档</li>
+        </ul>
+        <p class="slide-note">aiManager 定位：在自建 Gitea 之上，用业务平台把「人、需求、仓库、流水线」串起来</p>
+      </section>
+
+      <!-- 3 痛点总览 -->
+      <section class="slide" data-index="2">
+        <h2>五大痛点 → 五大能力（总览）</h2>
+        <div class="grid-5">
+          <div class="mini-card">
+            <div class="num">01</div>
+            <div class="pain">口头需求</div>
+            <div class="arrow">↓</div>
+            <div class="solve">结构化表单 + 需求池</div>
+          </div>
+          <div class="mini-card">
+            <div class="num">02</div>
+            <div class="pain">看不见他人需求</div>
+            <div class="arrow">↓</div>
+            <div class="solve">公开池 + 标签订阅通知</div>
+          </div>
+          <div class="mini-card">
+            <div class="num">03</div>
+            <div class="pain">重复开发</div>
+            <div class="arrow">↓</div>
+            <div class="solve">需求唯一 + 先到先得认领</div>
+          </div>
+          <div class="mini-card">
+            <div class="num">04</div>
+            <div class="pain">协作流程混乱</div>
+            <div class="arrow">↓</div>
+            <div class="solve">模板建仓 · PR · Actions CI</div>
+          </div>
+          <div class="mini-card">
+            <div class="num">05</div>
+            <div class="pain">交付后无人跟进</div>
+            <div class="arrow">↓</div>
+            <div class="solve">平台反馈同步 Gitea Issue</div>
+          </div>
+        </div>
+        <p class="slide-note">以下 5 页逐条展开「痛在哪 / 平台怎么解」</p>
+      </section>
+
+      <!-- 4 痛点1 -->
+      <section class="slide" data-index="3">
+        <h2>① 口头需求 · 找不到统一入口</h2>
+        <div class="pair">
+          <div class="pair-box pain">
+            <h3>痛点</h3>
+            <ul>
+              <li>需求散落在 IM、会议、口头，<strong>无法检索、无法排期</strong></li>
+              <li>提出方说不清验收标准，开发<strong>反复对齐浪费时间</strong></li>
+              <li>管理者看不到「谁在等什么」，<strong>资源无法统筹</strong></li>
+            </ul>
+          </div>
+          <div class="pair-mid">→</div>
+          <div class="pair-box solve">
+            <h3>aiManager 方案</h3>
+            <ul>
+              <li><strong>简化发布表单</strong>：非技术同事也能发布结构化需求单</li>
+              <li>需求进入<strong>公开需求池</strong>，卡片展示状态与标签</li>
+              <li>需求沟通<strong>时间线</strong>、共同需求人，过程留痕</li>
+            </ul>
+          </div>
+        </div>
+        <p class="slide-note">面向小白：引导文案与「下一步」提示，降低发布门槛</p>
+      </section>
+
+      <!-- 5 痛点2 -->
+      <section class="slide" data-index="4">
+        <h2>② 有能力的人 · 却不知道有什么可做</h2>
+        <div class="pair">
+          <div class="pair-box pain">
+            <h3>痛点</h3>
+            <ul>
+              <li>开发只服务「熟人队列」，<strong>池外需求长期积压</strong></li>
+              <li>技能与兴趣不匹配，<strong>认领效率低</strong></li>
+              <li>新需求没有触达机制，<strong>信息孤岛</strong></li>
+            </ul>
+          </div>
+          <div class="pair-mid">→</div>
+          <div class="pair-box solve">
+            <h3>aiManager 方案</h3>
+            <ul>
+              <li><strong>需求池 + 标签</strong>：按能力方向浏览与筛选</li>
+              <li><strong>标签订阅</strong>：匹配的新需求定向通知</li>
+              <li>认领前可见背景与沟通记录，<strong>减少误领</strong></li>
+            </ul>
+          </div>
+        </div>
+        <p class="slide-note">让「愿意做的人」主动看见任务，而不是只靠私下指派</p>
+      </section>
+
+      <!-- 6 痛点3 -->
+      <section class="slide" data-index="5">
+        <h2>③ 重复造轮子 · 同一功能多套实现</h2>
+        <div class="pair">
+          <div class="pair-box pain">
+            <h3>痛点</h3>
+            <ul>
+              <li>同一业务需求被<strong>多个小组并行实现</strong></li>
+              <li>缺少「谁在做」的权威状态，<strong>冲突发现太晚</strong></li>
+              <li>维护成本随副本数量线性上升</li>
+            </ul>
+          </div>
+          <div class="pair-mid">→</div>
+          <div class="pair-box solve">
+            <h3>aiManager 方案</h3>
+            <ul>
+              <li>业务侧<strong>需求单唯一化</strong>，一个需求对应一条主线</li>
+              <li><strong>先到先得原子认领</strong>：并发认领不会重复开工</li>
+              <li>认领后自动关联项目与仓库，<strong> ownership 清晰</strong></li>
+            </ul>
+          </div>
+        </div>
+        <p class="slide-note">README 核心表：「多人重复开发相同功能 → 认领锁 + 唯一需求单」</p>
+      </section>
+
+      <!-- 7 痛点4 -->
+      <section class="slide" data-index="6">
+        <h2>④ 协作与发布 · 缺少规范底座</h2>
+        <div class="pair">
+          <div class="pair-box pain">
+            <h3>痛点</h3>
+            <ul>
+              <li>临时目录、手工拷代码，<strong>无版本、无评审</strong></li>
+              <li>没有统一 CI，<strong>上线质量靠个人习惯</strong></li>
+              <li>组织难以审计「谁改了什么、何时发布」</li>
+            </ul>
+          </div>
+          <div class="pair-mid">→</div>
+          <div class="pair-box solve">
+            <h3>aiManager 方案</h3>
+            <ul>
+              <li>认领后<strong>按模板自动创建 Gitea 仓库</strong></li>
+              <li>标准流程：<strong>分支 → PR → 评审 → merge</strong></li>
+              <li><strong>Gitea Actions（act_runner）</strong> 构建/测试/发布，状态回写平台</li>
+            </ul>
+          </div>
+        </div>
+        <p class="slide-note">平台通过 Gitea API + Webhook 把 PR、流水线与业务状态打通</p>
+      </section>
+
+      <!-- 8 痛点5 -->
+      <section class="slide" data-index="7">
+        <h2>⑤ 交付之后 · 反馈石沉大海</h2>
+        <div class="pair">
+          <div class="pair-box pain">
+            <h3>痛点</h3>
+            <ul>
+              <li>用户问题发在群里，<strong>没有负责人、没有优先级</strong></li>
+              <li>开发已转其他项目，<strong>历史上下文丢失</strong></li>
+              <li>迭代无法闭环，<strong>工具逐渐无人维护</strong></li>
+            </ul>
+          </div>
+          <div class="pair-mid">→</div>
+          <div class="pair-box solve">
+            <h3>aiManager 方案</h3>
+            <ul>
+              <li>平台内<strong>提交反馈</strong>，自动在对应仓库创建 <strong>Issue</strong></li>
+              <li>需求沟通与成果中心（README / 教程 / 下载）<strong>集中呈现</strong></li>
+              <li>Issue 驱动再次 PR，形成<strong>发布 → 反馈 → 迭代</strong> 闭环</li>
+            </ul>
+          </div>
+        </div>
+        <p class="slide-note">全链路 E2E（68 项）覆盖：注册 → 建仓 → PR → CI → 反馈 Issue</p>
+      </section>
+
+      <!-- 9 AI 延伸 -->
+      <section class="slide" data-index="8">
+        <h2>延伸方案 · 让员工用 AI 安全协作</h2>
+        <div class="pair">
+          <div class="pair-box pain">
+            <h3>新痛点（AI 时代）</h3>
+            <ul>
+              <li>AI 能写代码，但<strong>碰不到内部需求与 Git 规范</strong></li>
+              <li>把管理员 Token 交给客户端<strong>风险极高</strong></li>
+              <li>自动 commit/push 缺少<strong>确认与审计</strong></li>
+            </ul>
+          </div>
+          <div class="pair-mid">→</div>
+          <div class="pair-box solve">
+            <h3>aiManager 方案</h3>
+            <ul>
+              <li><strong>Agent API</strong> + 员工 PAT（scope 分级 + 审计）</li>
+              <li><strong>远程 MCP</strong> 查需求/反馈；<strong>本地 MCP / aim CLI</strong> 安全 Git</li>
+              <li><strong>safe-git</strong>：工作区/分支限制；写操作需 MCP 确认或 <code>aim approve</code></li>
+            </ul>
+          </div>
+        </div>
+        <p class="slide-note">原则：平台给身份与上下文；代码 push 走员工自己的 Gitea 凭证，不下发服务端 Token</p>
+      </section>
+
+      <!-- 10 小结 -->
+      <section class="slide" data-index="9">
+        <h2>小结：一套平台，解决五条协作断点</h2>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <h3>对业务同事</h3>
+            <p>会填表就能发需求、看进度、提反馈；不必认识「哪个开发」。</p>
+          </div>
+          <div class="summary-card">
+            <h3>对开发同事</h3>
+            <p>需求池可见、认领有锁、仓库与 CI 开箱即用；AI 工具可接入但不越权。</p>
+          </div>
+          <div class="summary-card">
+            <h3>对团队 / 运维</h3>
+            <p>Docker Compose 单机部署；Caddy 统一入口；文档与 E2E 保障可运维。</p>
+          </div>
+        </div>
+        <ul class="plain" style="margin-top: 0.8em;">
+          <li>完整版架构与流程：<code>docs/presentation/index.html</code></li>
+          <li>MCP / CLI：<code>docs/agent-tools-tutorial.md</code> · <code>docs/mcp.md</code> · <code>docs/cli.md</code></li>
+        </ul>
+        <p class="brand-footer">
+          aiManager
+          <em>让技术更简单，让管理更智能</em>
+        </p>
+      </section>
+    </div>
+    <div class="toolbar">
+      <button type="button" id="prev" aria-label="上一页">← 上一页</button>
+      <span class="count" id="count">1 / 10</span>
+      <button type="button" id="next" aria-label="下一页">下一页 →</button>
+      <button type="button" id="fs" aria-label="全屏">全屏</button>
+      <a href="../index.html">完整 8 页版</a>
+    </div>
+  </div>
+  <script>
+    /**
+     * 幻灯片导航：键盘 ←/→/空格、工具栏、全屏
+     */
+    const slides = [...document.querySelectorAll(".slide")];
+    let index = 0;
+    const countEl = document.getElementById("count");
+
+    /** 显示指定页并更新页码 */
+    function show(i) {
+      index = (i + slides.length) % slides.length;
+      slides.forEach((s, n) => s.classList.toggle("active", n === index));
+      countEl.textContent = `${index + 1} / ${slides.length}`;
+    }
+
+    document.getElementById("prev").onclick = () => show(index - 1);
+    document.getElementById("next").onclick = () => show(index + 1);
+    document.getElementById("fs").onclick = () => {
+      const el = document.getElementById("stage");
+      (document.fullscreenElement ? document.exitFullscreen : el.requestFullscreen)?.();
+    };
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === " ") {
+        e.preventDefault();
+        show(index + 1);
+      }
+      if (e.key === "ArrowLeft") show(index - 1);
+    });
+    show(0);
+  </script>
+</body>
+</html>

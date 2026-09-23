@@ -10,16 +10,16 @@ todos:
     status: completed
   - id: remote-mcp
     content: 实现并部署远程 Streamable HTTP MCP 的平台工具、资源与 prompts
-    status: in_progress
+    status: completed
   - id: local-cli-mcp
     content: 实现 aim CLI 与本地 stdio MCP companion 的安全 Git/PR/CI 工作流
-    status: pending
+    status: completed
   - id: confirmation-security
     content: 实现 elicitation/aim approve 双路径确认及 Git 安全策略
-    status: pending
+    status: completed
   - id: docs-tests-release
     content: 补齐安装配置文档、单元/协议/CLI/Gitea E2E 测试与发布流程
-    status: pending
+    status: completed
 isProject: false
 ---
 

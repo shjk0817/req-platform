@@ -29,8 +29,8 @@ chmod +x deploy/gitea/init.sh
 # 4. 重启 Runner 完成注册
 docker compose restart gitea-runner
 
-# 5. 启动平台
-docker compose up -d --build api web caddy
+# 5. 启动平台与远程 MCP
+docker compose up -d --build api agent-mcp web caddy
 
 # 6. 检查
 docker compose ps
@@ -38,6 +38,25 @@ curl -s http://app.localhost/api/health   # 返回 {"status":"ok"} 即正常
 ```
 
 访问 `http://app.localhost`，用 `.env` 中的 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 登录。
+
+### 局域网访问（IP 会变）
+
+Docker 默认已在宿主机 **`0.0.0.0:8080` / `8081`** 上暴露端口；不必为每个新 IP 改 `APP_ADDR`。
+
+推荐在 `.env` 中让 Caddy **按容器内端口监听、接受任意 Host**：
+
+```bash
+APP_ADDR=:80
+GITEA_ADDR=:8081
+CADDY_HTTP_PORT=8080          # 宿主机访问 http://<任意可达IP>:8080
+CADDY_GITEA_HTTP_PORT=8081    # Git 服务 http://<同一IP>:8081
+APP_URL=http://localhost:8080 # 本机；邮件/通知里的绝对链接可仍用 localhost 或固定域名
+GITEA_ROOT_URL=http://localhost:8081/
+```
+
+同事用 **`http://<服务器当前局域网 IP>:8080`** 打开即可，无需再改 `APP_ADDR`。  
+**SSO 仍要求平台与 Git 使用同一主机名**（例如都用 `172.17.200.46`，不要平台用 IP、Git 用 `localhost`）。  
+API 返回的 clone 链接仍来自 `GITEA_ROOT_URL`；若需链接里显示当前 IP，可把 `APP_URL` / `GITEA_ROOT_URL` 改成该 IP 后 `docker compose up -d`（或改用固定内网 DNS）。
 
 ### 端口被占用时
 
@@ -149,6 +168,16 @@ docker compose pull
 docker compose up -d --build
 # 3. Gitea 大版本升级前先看官方 Release Note，跨版本需逐级升级
 ```
+
+### MCP / CLI 发布
+
+- 远程 MCP 随 `agent-mcp` 镜像发布，更新 `apps/agent-tools` 后执行
+  `docker compose up -d --build agent-mcp`。
+- 员工 CLI 与本地 MCP 由 `apps/agent-tools` 打包到公司内部 npm Registry；
+  发布前依次执行 `npm run lint`、`npm test`、`npm run pack:check`，再执行
+  `npm version patch` 和 `npm publish --registry "$AIMANAGER_NPM_REGISTRY"`。
+- 发布后用员工测试 PAT 执行 `aim doctor`，并用 MCP 客户端完成一次只读工具调用；
+  不要用平台管理员 `GITEA_API_TOKEN` 作为员工凭据。
 
 ## 七、常见问题排查
 

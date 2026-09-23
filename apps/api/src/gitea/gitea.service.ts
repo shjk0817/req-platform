@@ -221,8 +221,8 @@ export class GiteaService {
       return null;
     }
 
-    // 用户名冲突时重试，最多 3 次（重名时追加序号，而不是随机后缀）
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    // 用户名冲突时继续追加序号，允许重复执行测试或历史账号较多时顺利开通
+    for (let attempt = 0; attempt < 20; attempt += 1) {
       const username = buildGiteaUsername(input.email, input.name, attempt);
       const taken = await this.getUser(username).catch(() => null);
       if (taken) {

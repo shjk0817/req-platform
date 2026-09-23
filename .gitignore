@@ -21,6 +21,8 @@ deploy/runner/cache/
 .vscode/
 .idea/
 .DS_Store
+# Cursor MCP：含本机绝对路径，每人本地配置
+.cursor/mcp.json
 
 # 测试与覆盖率
 coverage/

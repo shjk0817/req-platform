@@ -18,6 +18,14 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 export class AgentController {
   constructor(private readonly agent: AgentService) {}
 
+  /** 返回 Agent API 版本与能力声明 */
+  @Get('capabilities')
+  @Scopes('read')
+  @ApiOperation({ summary: '获取 Agent API 能力声明' })
+  getCapabilities() {
+    return this.agent.getCapabilities();
+  }
+
   /** 聚合当前用户的待办、通知和反馈 */
   @Get('me/work')
   @Scopes('read')

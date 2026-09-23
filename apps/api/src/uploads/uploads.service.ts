@@ -13,7 +13,7 @@ import { Injectable, Logger, NotFoundException, PayloadTooLargeException, BadReq
 import { ConfigService } from '@nestjs/config';
 import { Attachment, AttachmentKind } from '@prisma/client';
 import { createReadStream } from 'node:fs';
-import { mkdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, extname } from 'node:path';
 import type { Response } from 'express';
 
@@ -99,7 +99,7 @@ export class UploadsService {
     await mkdir(absoluteDir, { recursive: true });
     const absolutePath = join(this.uploadDir, storagePath);
     if (file.path) {
-      await rename(file.path, absolutePath);
+      await this.moveTemporaryFile(file.path, absolutePath);
     } else if (file.buffer) {
       await writeFile(absolutePath, file.buffer);
     }
@@ -121,6 +121,19 @@ export class UploadsService {
     } catch (error) {
       await unlink(absolutePath).catch(() => undefined);
       throw error;
+    }
+  }
+
+  /** 移动临时文件；临时目录与持久化卷跨设备时回退为复制后删除 */
+  private async moveTemporaryFile(source: string, target: string): Promise<void> {
+    try {
+      await rename(source, target);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EXDEV') {
+        throw error;
+      }
+      await copyFile(source, target);
+      await unlink(source);
     }
   }
 

@@ -3,9 +3,11 @@
 # - app.*   -> 自研需求协作平台前端 + 后端 API（同域 /api）
 # - git.*   -> Gitea（仓库/PR/Issue/CI）
 #
-# 站点地址由环境变量提供，写法决定是否启用 TLS：
-#   生产环境：APP_ADDR=app.example.com      （Caddy 自动申请 Let's Encrypt 证书）
-#   本地调试：APP_ADDR=http://app.localhost  （纯 HTTP，便于自定义端口）
+# 站点地址由环境变量 APP_ADDR / GITEA_ADDR 提供：
+#   局域网 IP 常变：设为 :80 与 :8081（容器内端口），接受任意 Host；宿主机仍通过
+#   CADDY_HTTP_PORT / CADDY_GITEA_HTTP_PORT 映射（Docker 默认绑定 0.0.0.0）。
+#   生产环境：APP_ADDR=app.example.com（自动 HTTPS）
+#   本地域名：APP_ADDR=http://localhost
 # ============================================================
 
 {

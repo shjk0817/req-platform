@@ -179,3 +179,32 @@ describe('GiteaService 成果读取', () => {
     ]);
   });
 });
+
+describe('GiteaService 用户开通', () => {
+  it('用户名连续冲突时继续使用序号，避免重复 E2E 运行失败', async () => {
+    const service = createService();
+    const getUser = jest
+      .spyOn(service, 'getUser')
+      .mockResolvedValueOnce({ id: 1, login: 'zhanglei' })
+      .mockResolvedValueOnce({ id: 2, login: 'zhanglei2' })
+      .mockResolvedValueOnce({ id: 3, login: 'zhanglei3' })
+      .mockResolvedValueOnce(null);
+    const createUser = jest.spyOn(service, 'createUser').mockResolvedValue({ id: 4, login: 'zhanglei4' });
+
+    await expect(
+      service.provisionUserAccount({
+        email: 'zhang.lei@example.com',
+        name: '张磊',
+      }),
+    ).resolves.toMatchObject({ username: 'zhanglei4' });
+
+    expect(getUser).toHaveBeenCalledTimes(4);
+    expect(createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'zhanglei4',
+        email: 'zhang.lei@example.com',
+        fullName: '张磊',
+      }),
+    );
+  });
+});

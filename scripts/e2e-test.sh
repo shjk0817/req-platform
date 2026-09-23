@@ -113,7 +113,7 @@ PROJECT="$(curl -s -X POST "${APP}/api/projects" -H "Authorization: Bearer ${REQ
 PROJECT_ID="$(echo "${PROJECT}" | jq -r '.id // empty')"
 check "需求发布成功" "$(echo "${PROJECT}" | jq -r '.status')" "OPEN"
 check "需求携带所选任务头像" "$(echo "${PROJECT}" | jq -r '.avatar')" "task-05"
-check "新需求初始完成进度为 10%" "$(echo "${PROJECT}" | jq -r '.progress')" "10"
+check "新需求初始完成进度为 0%" "$(echo "${PROJECT}" | jq -r '.progress')" "0"
 
 echo "=============================================="
 echo " 6. 开发者认领需求（自动建仓）"

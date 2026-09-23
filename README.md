@@ -63,7 +63,7 @@ flowchart TB
 | Git 与 CI 底座 | Gitea 1.22（兼容 GitHub API）+ act_runner（兼容 GitHub Actions 语法） |
 | 后端 | NestJS 10 + TypeScript + Prisma + PostgreSQL 16 + BullMQ/Redis 7 |
 | 前端 | Next.js 14（App Router）+ React 18 + Ant Design 5 |
-| 认证 | 邮箱注册 + 管理员审核 + JWT |
+| 认证 | 邮箱注册 + 管理员审核 + JWT / 个人访问令牌（PAT） |
 | 部署 | Docker Compose 单机部署（适合 100 人以内） |
 
 ## 快速开始
@@ -109,7 +109,7 @@ docker compose restart gitea-runner
 ### 5. 启动平台
 
 ```bash
-docker compose up -d --build api web caddy
+docker compose up -d --build api agent-mcp web caddy
 ```
 
 ### 6. 访问
@@ -182,7 +182,7 @@ docker compose exec -T api npm run seed:demo -- --skip-gitea
 
 | 场景 | 规则 | 示例 |
 | --- | --- | --- |
-| Gitea 用户名 | 姓名转拼音，重名时依次追加 2、3 | 张伟 → `zhangwei`；陈晓东 → `chenxiaodong` |
+| Gitea 用户名 | 姓名转拼音，重名时依次追加 2、3、4… | 张伟 → `zhangwei`；陈晓东 → `chenxiaodong` |
 | 仓库名 | `req-` + 标题拼音（音节间用 `-`）+ 随机后缀 | 物料齐套率分析与预警 → `req-wu-liao-qi-tao-lv-fen-xi-yu-yu-b0ad7b` |
 
 约 32 个字符后按音节边界截断（不会切出半个拼音），`ü` 统一写作 `v`（`率` → `lv`，
@@ -232,8 +232,8 @@ bash scripts/e2e-test.sh
 
 1. **注册**：用公司邮箱注册，等待管理员审核；审核通过后系统自动开通 Git 账号，
    初始密码通过邮件发送（也可由管理员在「用户审核」页一次性查看）。
-2. **完善资料**：在「个人资料」里点「更换头像」，从内置的人物插画头像里挑一个；
-   再填上「我能帮上的方向」，有相关标签的新需求发布时会通知你。
+2. **完善资料**：在「个人资料」里点「更换头像」，从内置的人物插画头像或自定义图片中选择；
+   也可以在「AI 工具访问」中创建仅显示一次的个人访问令牌。
 3. **提需求**：进入「发布需求」，选一个任务头像，写清背景、痛点、期望效果与验收标准；
    可上传**图片**（需求页以画廊形式直接显示）和**附件**（供同事下载）。
 4. **认领需求**：在「需求池」以卡片浏览需求（**点卡片任意位置即可进详情**），认领后系统自动创建仓库并授予推送权限；
@@ -247,6 +247,30 @@ bash scripts/e2e-test.sh
    开发者在平台或 Gitea 中回复，状态标记「已解决」会自动关闭 Issue。
 8. **看热力图**：工作台首页有全平台协作热力图，个人资料页有个人热力图（近 12 个月，按天统计）；
    首页「需求总数 / 待认领 / 开发中 / 待处理反馈」四个统计卡片可直接点进对应的筛选列表。
+
+## AI / MCP / CLI 工具
+
+平台提供远程 Streamable HTTP MCP、本地 stdio MCP companion 和 `aim` CLI：
+
+```bash
+npm install -g @aimanager/agent-tools --registry "$AIMANAGER_NPM_REGISTRY"
+aim auth login --token "$AIMANAGER_TOKEN"
+aim auth gitea --token "$AIM_GITEA_TOKEN"
+aim doctor
+```
+
+远程 MCP 只处理平台协作数据；本地 MCP 和 CLI 才能操作员工工作区、Git、PR、CI 与 Release。
+所有个人访问令牌支持 scope、过期和撤销，commit / push / PR / Release 必须经过 MCP 原生确认或
+`aim approve <action-id>`。**完整教程（进度、部署、Cursor 配置、示例流程）见
+[docs/agent-tools-tutorial.md](docs/agent-tools-tutorial.md)**；另见 [docs/cli.md](docs/cli.md)、
+[docs/mcp.md](docs/mcp.md) 和 [docs/security.md](docs/security.md)。
+
+Agent tools 发布前可在本地执行：
+
+```bash
+cd apps/agent-tools
+npm ci && npm run lint && npm test && npm run pack:check
+```
 
 ## 目录结构
 
@@ -262,7 +286,8 @@ aiManager/
 │   └── templates/               # 仓库模板与 CI/CD 流水线模板
 ├── apps/
 │   ├── api/                     # NestJS 后端（56 个源文件）
-│   └── web/                     # Next.js 前端（含头像、进度条、热力图组件）
+│   ├── web/                     # Next.js 前端（含头像、进度条、热力图组件）
+│   └── agent-tools/             # aim CLI、远程 MCP、本地 stdio MCP
 └── docs/                        # 架构与运维文档
 ```
 

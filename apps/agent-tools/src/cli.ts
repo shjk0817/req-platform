@@ -40,17 +40,25 @@ const auth = program.command('auth').description('管理平台与 Gitea 凭据')
 auth
   .command('login')
   .description('保存平台个人访问令牌')
-  .requiredOption('--token <token>', '平台个人访问令牌（只通过安全终端传入）')
-  .action(async (options: { token: string }) => {
-    await new CredentialStore().set('platform-token', options.token);
+  .option('--token <token>', '平台个人访问令牌（建议通过 AIMANAGER_TOKEN 环境变量传入）')
+  .action(async (options: { token?: string }) => {
+    const token = options.token ?? process.env.AIMANAGER_TOKEN;
+    if (!token) {
+      throw new Error('请通过 --token 或 AIMANAGER_TOKEN 提供平台令牌');
+    }
+    await new CredentialStore().set('platform-token', token);
     printResult({ saved: true, service: 'platform' }, format(), '平台令牌已保存到系统钥匙串。');
   });
 auth
   .command('gitea')
   .description('保存员工自己的 Gitea PAT')
-  .requiredOption('--token <token>', '员工 Gitea PAT')
-  .action(async (options: { token: string }) => {
-    await new CredentialStore().set('gitea-token', options.token);
+  .option('--token <token>', '员工 Gitea PAT（建议通过 AIM_GITEA_TOKEN 环境变量传入）')
+  .action(async (options: { token?: string }) => {
+    const token = options.token ?? process.env.AIM_GITEA_TOKEN;
+    if (!token) {
+      throw new Error('请通过 --token 或 AIM_GITEA_TOKEN 提供 Gitea PAT');
+    }
+    await new CredentialStore().set('gitea-token', token);
     printResult({ saved: true, service: 'gitea' }, format(), 'Gitea 令牌已保存到系统钥匙串。');
   });
 auth
@@ -73,6 +81,7 @@ configCommand
     const mapping: Record<string, keyof ReturnType<typeof loadConfig>> = {
       'api-url': 'apiUrl',
       'gitea-url': 'giteaUrl',
+      'gitea-org': 'giteaOrg',
       workspace: 'workspaceRoot',
       output: 'output',
     };
@@ -283,8 +292,16 @@ program
     const config = loadConfig();
     const token = await resolvePlatformToken();
     const workspaces = resolve(config.workspaceRoot);
-    const data = await (await client()).getMyWork({ pageSize: 1 });
-    printResult({ apiUrl: config.apiUrl, workspaceRoot: workspaces, token: `${token.slice(0, 12)}…`, api: data }, format(), 'aim doctor 检查通过。');
+    const apiClient = await client();
+    const [capabilities, data] = await Promise.all([
+      apiClient.getCapabilities(),
+      apiClient.getMyWork({ pageSize: 1 }),
+    ]);
+    printResult(
+      { apiUrl: config.apiUrl, workspaceRoot: workspaces, token: `${token.slice(0, 12)}…`, capabilities, api: data },
+      format(),
+      'aim doctor 检查通过。',
+    );
   });
 
 const mcp = program.command('mcp').description('本地 MCP companion');

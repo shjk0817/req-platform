@@ -39,6 +39,11 @@ export class AgentClient {
     return this.request<unknown>('/agent/me/work', { query });
   }
 
+  /** 探测 Agent API 版本和能力 */
+  getCapabilities() {
+    return this.request<unknown>('/agent/capabilities');
+  }
+
   /** 查询项目 */
   listProjects(query: Record<string, string | number | boolean | undefined> = {}) {
     return this.request<unknown>('/agent/projects', { query });

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>aiManager 项目汇报</title>
+  <style>
+    /* 暖色 parchment 汇报幻灯片 — 16:9 全屏播放 */
+    :root {
+      --parchment: #f7f7f4;
+      --bone: #f2f1ed;
+      --ink: #26251e;
+      --mist: #a1a19f;
+      --ember: #f54e00;
+      --forest: #34785c;
+      --radius: 4px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #1a1916;
+      color: var(--ink);
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .deck {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .stage {
+      width: min(100%, calc((100vh - 80px) * 16 / 9));
+      aspect-ratio: 16 / 9;
+      background: var(--parchment);
+      border: 1px solid #cdcdc9;
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 8px 32px rgba(38, 37, 30, 0.35);
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .slide img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .slide.text-slide {
+      padding: 5% 6%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: var(--parchment);
+    }
+    .slide.text-slide h2 {
+      font-size: clamp(22px, 3.2vw, 40px);
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.6em;
+      border-bottom: 3px solid var(--ember);
+      padding-bottom: 0.35em;
+      width: fit-content;
+    }
+    .slide.text-slide ul {
+      list-style: none;
+      font-size: clamp(14px, 1.55vw, 22px);
+      line-height: 1.65;
+      color: var(--ink);
+    }
+    .slide.text-slide li {
+      margin: 0.45em 0;
+      padding-left: 1.2em;
+      position: relative;
+    }
+    .slide.text-slide li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 6px;
+      height: 6px;
+      background: var(--forest);
+      border-radius: 1px;
+    }
+    .slide.text-slide .meta {
+      margin-top: auto;
+      font-size: 13px;
+      color: var(--mist);
+    }
+    .toolbar {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      color: #e6e5e0;
+      font-size: 14px;
+    }
+    .toolbar button {
+      background: var(--bone);
+      color: var(--ink);
+      border: 1px solid #cdcdc9;
+      border-radius: var(--radius);
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .toolbar button:hover { background: #fff; }
+    .toolbar .count { min-width: 4em; text-align: center; }
+    .toolbar a {
+      color: #e6e5e0;
+      margin-left: 8px;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .toolbar a:hover { text-decoration: underline; }
+    @media print {
+      body { background: white; }
+      .deck { padding: 0; }
+      .toolbar { display: none; }
+      .stage { width: 100%; box-shadow: none; border: none; page-break-after: always; }
+      .slide { position: relative; opacity: 1 !important; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+    <div class="stage" id="stage">
+      <section class="slide active" data-index="0">
+        <img src="assets/slide-01-cover.png" alt="封面：内部需求协作平台 aiManager" />
+      </section>
+      <section class="slide" data-index="1">
+        <img src="assets/slide-02-painpoints.png" alt="解决什么问题" />
+      </section>
+      <section class="slide" data-index="2">
+        <img src="assets/slide-03-flow.png" alt="核心流程" />
+      </section>
+      <section class="slide" data-index="3">
+        <img src="assets/slide-04-architecture.png" alt="系统架构" />
+      </section>
+      <section class="slide text-slide" data-index="4">
+        <h2>技术栈与部署</h2>
+        <ul>
+          <li>前端：Next.js 14 + Ant Design 5，暖色 parchment 统一视觉</li>
+          <li>后端：NestJS + Prisma + PostgreSQL，Redis / BullMQ 异步任务</li>
+          <li>Git / CI：Gitea 1.22 + act_runner，模板建仓、Webhook、流水线回写</li>
+          <li>部署：Docker Compose 单机编排，Caddy 反代，适合百人以内的内网团队</li>
+          <li>认证：邮箱注册 + 管理员审核；Gitea SSO；员工 PAT 供 MCP / CLI</li>
+        </ul>
+        <p class="meta">访问示例：平台 :8080 · Git :8081 · 需同一主机名以支持免密登录</p>
+      </section>
+      <section class="slide" data-index="5">
+        <img src="assets/slide-05-mcp-cli.png" alt="AI 辅助工具 MCP 与 CLI" />
+      </section>
+      <section class="slide text-slide" data-index="6">
+        <h2>体验与质量</h2>
+        <ul>
+          <li>面向非技术同事：简化发布需求、卡片式需求池、引导与「下一步」提示</li>
+          <li>需求沟通时间线、共同需求人、成果中心（README / 教程 / 下载）</li>
+          <li>自定义头像、开发模式账号选择器，便于演示与测试</li>
+          <li>自动化验收：注册 → 建仓 → PR → CI 回写 → 反馈 Issue 闭环（68 项 E2E）</li>
+          <li>Agent API + 远程 MCP + aim CLI：员工用 AI 安全协作与推送代码</li>
+        </ul>
+        <p class="meta">文档：docs/cli.md · docs/mcp.md · docs/security.md</p>
+      </section>
+      <section class="slide" data-index="7">
+        <img src="assets/slide-06-summary.png" alt="小结与展望" />
+      </section>
+    </div>
+    <div class="toolbar">
+      <button type="button" id="prev" aria-label="上一页">← 上一页</button>
+      <span class="count" id="count">1 / 8</span>
+      <button type="button" id="next" aria-label="下一页">下一页 →</button>
+      <button type="button" id="fs" aria-label="全屏">全屏</button>
+      <a href="v2/index.html">痛点版 10 页</a>
+    </div>
+  </div>
+  <script>
+    /** 键盘与按钮切换幻灯片 */
+    const slides = [...document.querySelectorAll(".slide")];
+    let index = 0;
+    const countEl = document.getElementById("count");
+    function show(i) {
+      index = (i + slides.length) % slides.length;
+      slides.forEach((s, n) => s.classList.toggle("active", n === index));
+      countEl.textContent = `${index + 1} / ${slides.length}`;
+    }
+    document.getElementById("prev").onclick = () => show(index - 1);
+    document.getElementById("next").onclick = () => show(index + 1);
+    document.getElementById("fs").onclick = () => {
+      const el = document.getElementById("stage");
+      (document.fullscreenElement ? document.exitFullscreen : el.requestFullscreen)?.();
+    };
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); show(index + 1); }
+      if (e.key === "ArrowLeft") show(index - 1);
+    });
+    show(0);
+  </script>
+</body>
+</html>

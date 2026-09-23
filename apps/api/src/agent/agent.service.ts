@@ -25,6 +25,24 @@ export class AgentService {
     private readonly audit: AgentAuditService,
   ) {}
 
+  /** 返回版本化能力声明，供 CLI / MCP 启动时探测 */
+  getCapabilities() {
+    return {
+      apiVersion: 'v1',
+      serverVersion: '0.1.0',
+      capabilities: {
+        workContext: true,
+        projectContext: true,
+        projectWrites: true,
+        feedbackWrites: true,
+        gitMetadata: true,
+        audit: true,
+      },
+      scopes: ['read', 'project:write', 'feedback:write', 'git:metadata'],
+      confirmation: ['mcp_elicitation', 'aim_approve'],
+    };
+  }
+
   /** 汇总当前用户待办、未读通知和待处理反馈 */
   async getMyWork(user: AuthUser, query: PaginationQueryDto) {
     const [todos, notifications, unread, feedbacks] = await Promise.all([
